@@ -1,2 +1,2 @@
-# drone-obstacle-avoidance
-Simulation of obstacle avoidance of a drone.
+# A quadcopter obstacle avoidance simulator
+Uses Allegro 4.4 and GSL.
