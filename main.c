@@ -7,9 +7,9 @@
 
 /* global vars */
 
-double arr_state[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-double arr_forces[4] = {0,0,0,0}; 
-double arr_error[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+double arr_state[SIZE_X] = {0.0};
+double arr_forces[SIZE_U] = {0.0}; 
+double arr_error[SIZE_X] = {0.0};
 
 float w_lift_off = 0.0;
 float yawref = 0.0;
@@ -50,8 +50,8 @@ int ret = 0;
     
 	tp_gfx.arg = 2;
 	tp_gfx.period = TPERIOD_GRAPHICS;
-	tp_gfx.deadline = TPERIOD_GRAPHICS * 0.9;
-	tp_gfx.priority = 21;
+	tp_gfx.deadline = TPERIOD_GRAPHICS * 0.7;
+	tp_gfx.priority = 30;
 	tp_gfx.dmiss = 0;
 
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
@@ -87,6 +87,7 @@ int ret = 0;
 	return 0;
 }
 
+
 void *lin_model_task(void* arg)
 {
 struct task_par *tp;
@@ -104,6 +105,14 @@ struct task_par *tp;
 
 	read_matrix_file("A.bin", A);
 	read_matrix_file("B.bin", B);
+	
+	while(gfx_initialized == 0)
+	{
+		if (deadline_miss (tp))
+			printf ("DEADLINE MISS: lin_model_task()\n");
+		
+		wait_for_period (tp);
+	}
 
 	while ( keypressed() == 0)
     {		
@@ -124,7 +133,7 @@ struct task_par *tp;
 		}
 		
 		pthread_mutex_unlock (&mux_state);
-// 	
+		
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
@@ -161,14 +170,22 @@ void* lqr_task(void* arg)
 	gsl_vector_set(setpoint, 4, 1);
 	gsl_vector_set(setpoint, 5, 1);
 	
+	while(gfx_initialized == 0)
+	{
+		if (deadline_miss (tp))
+			printf ("DEADLINE MISS: lqr_task()\n");
+		
+		wait_for_period (tp);
+	}
+	
 	while(keypressed() == 0)
 	{
 		pthread_mutex_lock (&mux_state);
 		
 		for(int i = 0; i < SIZE_X; i++)
-
 			gsl_vector_set(state, i, arr_state[i]);
 			//printf("arr_state: %lf\n",arr_state[5]);
+		
 		pthread_mutex_unlock (&mux_state);
 		
 		dlqr_control(setpoint, state, K, forces);
@@ -179,6 +196,9 @@ void* lqr_task(void* arg)
 			arr_forces[i] = gsl_vector_get(forces, i);
 		
 		pthread_mutex_unlock (&mux_forces);
+		
+		if (deadline_miss (tp))
+			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
 	}
@@ -194,70 +214,52 @@ void* lqr_task(void* arg)
 
 void *gfx_task(void* arg)
 {
+	
 struct task_par *tp;
 
-double cX[2] = {50, 125};
-double cX_prev[2] = {50, 125};
+double arr_graph_X[GRAPH_DATA_SIZE] = {0.0};
+double arr_graph_Y[GRAPH_DATA_SIZE] = {0.0};
+double arr_graph_Z[GRAPH_DATA_SIZE] = {0.0};
 
-double cY[2] = {50, 325};
-double cY_prev[2] = {50, 325};
-
-double cZ[2] = {50, 525};
-double cZ_prev[2] = {50, 525};
-
-int step = 1;
-int colour = 0;
+int col = makecol8(0, 255, 0);
 
 	tp = (struct task_par *)arg;
+	
 	set_period (tp);
 
 	start_allegro();
+	
+	rect(screen, 50, 50, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
+	rect(screen, 50, 250, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
+	rect(screen, 50, 450, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	
+	textout_centre_ex(screen, font, "X position", 100, 40, col,-1);
+	textout_centre_ex(screen, font, "Y position", 100, 240, col, -1);
+	textout_centre_ex(screen, font, "Z position", 100, 440, col, -1);
 	
 	gfx_initialized = 1;
 	
 	while(keypressed() == 0)
 	{
-		colour = makecol(0, 255, 0);
-		
-		rect(screen, 50, 50, 750, 150, colour);
-		rect(screen, 50, 250, 750, 350, colour);
-		rect(screen, 50, 450, 750, 550, colour);
-		
 		pthread_mutex_lock(&mux_state);
 		
-		cZ_prev[0] = cZ[0];
-		cZ_prev[1] = cZ[1];
-
-		cX_prev[0] = cX[0];
-		cX_prev[1] = cX[1];
-
-		cY_prev[0] = cY[0];
-		cY_prev[1] = cY[1];
-			
-		cZ[0] = 50 + step;
-		cZ[1] = 50 + 75 - (int)(arr_state[5] * 50);
-
-		cX[0] = 50 + step;
-		cX[1] = 325 - (int)(arr_state[4] * 50);
-
-		cY[0] = 50 + step;
-		cY[1] = 525 - (int)(arr_state[3] * 50);		
+		shift_and_append(arr_graph_X, GRAPH_DATA_SIZE, arr_state[3]);
+		rectfill(screen, 51, 51, 149, 149, makecol(0,0,0));
+		update_graph(screen, arr_graph_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);
 		
-		textout_centre_ex(screen,font,"Quadcopter X position",400, 40, colour,-1);
-		textout_centre_ex(screen,font,"Quadcopter Y position",400, 240, colour, -1);
-		textout_centre_ex(screen,font,"Quadcopter Z position",400, 440, colour, -1);
+		shift_and_append(arr_graph_Y, GRAPH_DATA_SIZE, arr_state[4]);
+		rectfill(screen, 51, 251, 149, 349, makecol(0,0,0));
+		update_graph(screen, arr_graph_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
 		
-		fastline(screen, cZ_prev[0], cZ_prev[1],cZ[0],cZ[1], colour);
-		fastline(screen, cY_prev[0], cY_prev[1],cY[0],cY[1], colour);
-		fastline(screen, cX_prev[0], cX_prev[1],cX[0],cX[1], colour);
-		
-		//putpixel(screen, cZ[0], cZ[1], colour);
+		shift_and_append(arr_graph_Z, GRAPH_DATA_SIZE, arr_state[5]);
+		rectfill(screen, 51, 451, 149, 549, makecol(0,0,0));
+		update_graph(screen, arr_graph_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+
 		pthread_mutex_unlock(&mux_state);
 		
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: gfx_task()\n");
-		
-		step ++;
+
 		//readkey();
 		wait_for_period (tp);
 

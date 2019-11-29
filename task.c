@@ -118,11 +118,18 @@ int result = -1;
 
 };
 
+void shift_and_append (double *array, int size, double new_element)
+{
+	for(int i = 1; i < size; i++)
+		array[i-1] = array[i];
+	array[size-1] = new_element;
+}
+
 void write_to_file (const char* filename, const char* text, int toappend)
 {
 	FILE *f_pointer;
 
-	if (toappend != 0){
+	if (toappend == 0){
 		f_pointer = fopen (filename, "w");
 	}
 	else

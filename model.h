@@ -12,17 +12,17 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 
-// typedef gsl_vector vect_f;
-// typedef gsl_matrix_float matr_f;
+typedef gsl_vector Vector;
+typedef gsl_matrix Matrix;
 
 /* Model */
 
-void quad_linear_model(gsl_vector *u, gsl_matrix *A, gsl_matrix *B, gsl_vector *x);
+void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
-//void quad_linear_model(gsl_vector *sp, gsl_matrix *A, gsl_matrix *B, gsl_vector *x, gsl_matrix* K);
+//void quad_linear_model(Vector *sp, Matrix *A, Matrix *B, Vector *x, Matrix* K);
 
-void dlqr_control(gsl_vector* sp, gsl_vector* x, gsl_matrix* K, gsl_vector* u);
+void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
 
-void compute_error(gsl_vector *setpoint, gsl_vector *state, gsl_vector *result);
+void compute_error(Vector *setpoint, Vector *state, Vector *result);
 
 #endif

@@ -48,6 +48,8 @@ int mutex_create (pthread_mutex_t mux, pthread_mutexattr_t matt, int prot, int c
 
 /* Utilities */
 
+void shift_and_append (double *array, int size, double new_element);
+
 void write_to_file (const char* filename, const char* text, int toappend);
 
 int read_matrix_file (const char* filename, gsl_matrix* M);

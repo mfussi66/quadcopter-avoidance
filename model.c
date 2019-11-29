@@ -11,9 +11,9 @@
  * allocates a new vector so that gsl_vector_sub() does not
  * overwrite the first argument
  */
-void compute_error(gsl_vector* setpoint, gsl_vector* state, gsl_vector *result)
+void compute_error(Vector* setpoint, Vector* state, Vector *result)
 {
-	gsl_vector* temp = gsl_vector_alloc_from_vector(setpoint, 0, SIZE_X, 1);
+	Vector* temp = gsl_vector_alloc_from_vector(setpoint, 0, SIZE_X, 1);
 	gsl_vector_sub(temp, state);
 	gsl_vector_memcpy(result, temp);
 }
@@ -26,9 +26,9 @@ void compute_error(gsl_vector* setpoint, gsl_vector* state, gsl_vector *result)
  * Discrete Linear Quadratic Regulator problem
  * Implements u = 1 * K * e + 0 * u
  */
-void dlqr_control(gsl_vector* sp, gsl_vector* x, gsl_matrix* K, gsl_vector* u)
+void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u)
 {
-	gsl_vector* e = gsl_vector_calloc(SIZE_X);
+	Vector* e = gsl_vector_calloc(SIZE_X);
 	gsl_vector_memcpy(e, sp);
 	
  	gsl_vector_sub(e, x);
@@ -42,11 +42,11 @@ void dlqr_control(gsl_vector* sp, gsl_vector* x, gsl_matrix* K, gsl_vector* u)
  * x(k+1) = A * x(k) + B * u(k)
  * Allocations done to avoid overwriting during add operation
  */
-void quad_linear_model(gsl_vector* u, gsl_matrix* A, gsl_matrix* B, gsl_vector* x)
+void quad_linear_model(Vector* u, Matrix* A, Matrix* B, Vector* x)
 {
 
-	gsl_vector *Bu = gsl_vector_calloc(SIZE_X);
-	gsl_vector *Ax = gsl_vector_calloc(SIZE_X);
+	Vector *Bu = gsl_vector_calloc(SIZE_X);
+	Vector *Ax = gsl_vector_calloc(SIZE_X);
 
 	gsl_blas_dgemv(CblasNoTrans, 1, B, u, 0, Bu);
 	gsl_blas_dgemv(CblasNoTrans, 1, A, x, 0, Ax);
