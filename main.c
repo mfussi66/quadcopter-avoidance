@@ -50,7 +50,7 @@ int ret = 0;
     
 	tp_gfx.arg = 2;
 	tp_gfx.period = TPERIOD_GRAPHICS;
-	tp_gfx.deadline = TPERIOD_GRAPHICS * 0.7;
+	tp_gfx.deadline = TPERIOD_GRAPHICS * 0.5;
 	tp_gfx.priority = 30;
 	tp_gfx.dmiss = 0;
 
@@ -60,7 +60,7 @@ int ret = 0;
     
 	tp_mod.arg = 1;
 	tp_mod.period = TPERIOD_MODEL;
-	tp_mod.deadline = TPERIOD_MODEL * 0.8;
+	tp_mod.deadline = TPERIOD_MODEL * 0.9;
 	tp_mod.priority = 22;
 	tp_mod.dmiss = 0;
 
@@ -70,7 +70,7 @@ int ret = 0;
     
 	tp_lqr.arg = 3;
 	tp_lqr.period = TPERIOD_LQR;
-	tp_lqr.deadline = TPERIOD_LQR * 0.8;
+	tp_lqr.deadline = TPERIOD_LQR * 0.5;
 	tp_lqr.priority = 23;
 	tp_lqr.dmiss = 0;
 
@@ -221,6 +221,8 @@ double arr_graph_X[GRAPH_DATA_SIZE] = {0.0};
 double arr_graph_Y[GRAPH_DATA_SIZE] = {0.0};
 double arr_graph_Z[GRAPH_DATA_SIZE] = {0.0};
 
+
+
 int col = makecol8(0, 255, 0);
 
 	tp = (struct task_par *)arg;
@@ -229,13 +231,15 @@ int col = makecol8(0, 255, 0);
 
 	start_allegro();
 	
-	rect(screen, 50, 50, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
-	rect(screen, 50, 250, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
-	rect(screen, 50, 450, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	BITMAP* buffer = create_bitmap(SCREEN_W, SCREEN_W);
 	
-	textout_centre_ex(screen, font, "X position", 100, 40, col,-1);
-	textout_centre_ex(screen, font, "Y position", 100, 240, col, -1);
-	textout_centre_ex(screen, font, "Z position", 100, 440, col, -1);
+	rect(buffer, 50, 50, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
+	rect(buffer, 50, 250, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
+	rect(buffer, 50, 450, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	
+	textout_centre_ex(buffer, font, "X position", 100, 40, col,-1);
+	textout_centre_ex(buffer, font, "Y position", 100, 240, col, -1);
+	textout_centre_ex(buffer, font, "Z position", 100, 440, col, -1);
 	
 	gfx_initialized = 1;
 	
@@ -244,18 +248,19 @@ int col = makecol8(0, 255, 0);
 		pthread_mutex_lock(&mux_state);
 		
 		shift_and_append(arr_graph_X, GRAPH_DATA_SIZE, arr_state[3]);
-		rectfill(screen, 51, 51, 149, 149, makecol(0,0,0));
-		update_graph(screen, arr_graph_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);
-		
-		shift_and_append(arr_graph_Y, GRAPH_DATA_SIZE, arr_state[4]);
-		rectfill(screen, 51, 251, 149, 349, makecol(0,0,0));
-		update_graph(screen, arr_graph_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
-		
 		shift_and_append(arr_graph_Z, GRAPH_DATA_SIZE, arr_state[5]);
-		rectfill(screen, 51, 451, 149, 549, makecol(0,0,0));
-		update_graph(screen, arr_graph_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
-
+		shift_and_append(arr_graph_Y, GRAPH_DATA_SIZE, arr_state[4]);
 		pthread_mutex_unlock(&mux_state);
+		
+		rectfill(buffer, 51, 51, 149, 149, makecol(0,0,0));
+		rectfill(buffer, 51, 451, 149, 549, makecol(0,0,0));
+		rectfill(buffer, 51, 251, 149, 349, makecol(0,0,0));
+		
+		update_graph(buffer, arr_graph_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);		
+		update_graph(buffer, arr_graph_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
+		update_graph(buffer, arr_graph_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+
+		blit(buffer,screen,0,0,0,0,SCREEN_W, SCREEN_H);
 		
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: gfx_task()\n");
