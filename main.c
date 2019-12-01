@@ -15,12 +15,16 @@ float w_lift_off = 0.0;
 float yawref = 0.0;
 
 int gfx_initialized = 0;
+int gfx_closed = 0;
+
+BITMAP* buffer_plt;
+BITMAP* buffer_gfx;
 
 /* Semaphores */
 
 pthread_mutex_t mux_forces;
-pthread_mutex_t mux_gfx;
 pthread_mutex_t mux_state;
+pthread_mutex_t mux_plt;
 
 pthread_mutexattr_t muxattr;
 
@@ -28,33 +32,46 @@ pthread_mutexattr_t muxattr;
 void* lqr_task (void* arg);
 void *lin_model_task (void *arg);
 void *gfx_task (void *arg);
+void *plt_task (void *arg);
 
 /* main thread */
 
 int main (int argc, char **argv) 
 {
 
-struct sched_param sched_mod, sched_gfx, sched_lqr;
-struct task_par tp_mod, tp_gfx, tp_lqr;
-pthread_attr_t attr_mod, attr_gfx, attr_lqr;
-pthread_t tid_mod, tid_gfx, tid_lqr;
+struct sched_param sched_mod, sched_gfx, sched_lqr, sched_plt;
+struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt;
+pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt;
+pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt;
 
 int ret = 0;
 
     mutex_create (mux_forces, muxattr, 0, 100);
     mutex_create (mux_state, muxattr, 0, 100);
-
+	mutex_create (mux_plt, muxattr, 0, 100);
+	 
 	pthread_mutexattr_destroy (&muxattr);
-
+	
 	//Create Graphics Thread
     
-	tp_gfx.arg = 2;
-	tp_gfx.period = TPERIOD_GRAPHICS;
-	tp_gfx.deadline = TPERIOD_GRAPHICS * 0.5;
-	tp_gfx.priority = 30;
+	tp_gfx.arg = 4;
+	tp_gfx.period = TPERIOD_GFX;
+	tp_gfx.deadline = TPERIOD_GFX * 0.5;
+	tp_gfx.priority = 31;
 	tp_gfx.dmiss = 0;
 
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
+
+
+	//Create Plotting Thread
+    
+	tp_plt.arg = 2;
+	tp_plt.period = TPERIOD_PLOTS;
+	tp_plt.deadline = TPERIOD_PLOTS * 0.5;
+	tp_plt.priority = 30;
+	tp_plt.dmiss = 0;
+
+	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
 
     //Create Dynamic Model Thread
     
@@ -79,11 +96,12 @@ int ret = 0;
 	pthread_join (tid_mod, 0);
 	pthread_join (tid_lqr, 0);
 	pthread_join (tid_gfx, 0);
-	
+	pthread_join (tid_plt, 0);
+		
     pthread_attr_destroy (&attr_mod);	
 	pthread_attr_destroy (&attr_lqr);
 	pthread_attr_destroy (&attr_gfx);
-	
+	pthread_attr_destroy (&attr_plt);
 	return 0;
 }
 
@@ -150,7 +168,12 @@ struct task_par *tp;
 
 }
 
-
+/*
+ * Task
+ * -----------------
+ * Used for computing error and
+ * control action
+ */
 void* lqr_task(void* arg)
 {
 	struct task_par *tp;
@@ -212,65 +235,151 @@ void* lqr_task(void* arg)
 	
 }
 
-void *gfx_task(void* arg)
+/*
+ * Task
+ * -----------------
+ * Used for drawing model
+ * 
+ */
+void* gfx_task(void* arg)
 {
 	
 struct task_par *tp;
 
-double arr_graph_X[GRAPH_DATA_SIZE] = {0.0};
-double arr_graph_Y[GRAPH_DATA_SIZE] = {0.0};
-double arr_graph_Z[GRAPH_DATA_SIZE] = {0.0};
-
-
-
-int col = makecol8(0, 255, 0);
+int col;
 
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
-
+	
 	start_allegro();
 	
-	BITMAP* buffer = create_bitmap(SCREEN_W, SCREEN_W);
+	pthread_mutex_lock(&mux_plt);
+	buffer_gfx = create_bitmap(SCREEN_W, SCREEN_H);
 	
-	rect(buffer, 50, 50, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
-	rect(buffer, 50, 250, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
-	rect(buffer, 50, 450, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	col = makecol(0, 255, 0);
 	
-	textout_centre_ex(buffer, font, "X position", 100, 40, col,-1);
-	textout_centre_ex(buffer, font, "Y position", 100, 240, col, -1);
-	textout_centre_ex(buffer, font, "Z position", 100, 440, col, -1);
+	rect(buffer_gfx, 5, 5, 560, 595, col);
+	
+	pthread_mutex_unlock(&mux_plt);
 	
 	gfx_initialized = 1;
 	
 	while(keypressed() == 0)
 	{
+		pthread_mutex_lock(&mux_plt);
+		
+		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
+
+		pthread_mutex_unlock(&mux_plt);
+		
+		if (deadline_miss (tp))
+			printf ("DEADLINE MISS: gfk_task()\n");
+		
+		wait_for_period (tp);
+	}
+	
+	gfx_closed = 1;
+	
+	close_allegro ();
+	
+	pthread_exit(0);
+}
+
+/*
+ * Task
+ * -----------------
+ * Used for plotting
+ * 
+ */
+void* plt_task(void* arg)
+{
+	
+struct task_par *tp;
+
+double plt_buf_Roll[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Pitch[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Yaw[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_X[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Y[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Z[GRAPH_DATA_SIZE] = {0.0};
+
+int col; 
+
+	tp = (struct task_par *)arg;
+	
+	set_period (tp);
+	
+	while(gfx_initialized == 0)
+	{
+		if (deadline_miss (tp))
+			printf ("DEADLINE MISS: plt_task()\n");
+		
+		wait_for_period (tp);
+	}
+	
+	col = makecol(0, 255, 0);
+
+	pthread_mutex_lock(&mux_plt);	
+	buffer_plt = create_bitmap(SCREEN_W, SCREEN_H);
+
+	rect(buffer_gfx, 695, 285, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 390, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 495, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	
+	rect(buffer_gfx, 580, 285, 680, 385, col);
+	rect(buffer_gfx, 580, 390, 680, 490, col);
+	rect(buffer_gfx, 580, 495, 680, 595, col);
+	
+	textout_centre_ex(buffer_gfx, font, "R", 575, 335, col, -1);
+	textout_centre_ex(buffer_gfx, font, "P", 575, 440, col, -1);
+	textout_centre_ex(buffer_gfx, font, "Y", 575, 545, col, -1);
+	
+	textout_centre_ex(buffer_gfx, font, "X", 690, 335, col, -1);
+	textout_centre_ex(buffer_gfx, font, "Y", 690, 440, col, -1);
+	textout_centre_ex(buffer_gfx, font, "Z", 690, 545, col, -1);
+	pthread_mutex_unlock(&mux_plt);
+	
+	while(keypressed() == 0 && gfx_closed ==0)
+	{
 		pthread_mutex_lock(&mux_state);
 		
-		shift_and_append(arr_graph_X, GRAPH_DATA_SIZE, arr_state[3]);
-		shift_and_append(arr_graph_Z, GRAPH_DATA_SIZE, arr_state[5]);
-		shift_and_append(arr_graph_Y, GRAPH_DATA_SIZE, arr_state[4]);
+		shift_and_append(plt_buf_X, GRAPH_DATA_SIZE, arr_state[3]);
+		shift_and_append(plt_buf_Z, GRAPH_DATA_SIZE, arr_state[5]);
+		shift_and_append(plt_buf_Y, GRAPH_DATA_SIZE, arr_state[4]);
+		
+		shift_and_append(plt_buf_Roll, GRAPH_DATA_SIZE, arr_state[0]);
+		shift_and_append(plt_buf_Pitch, GRAPH_DATA_SIZE, arr_state[1]);
+		shift_and_append(plt_buf_Yaw, GRAPH_DATA_SIZE, arr_state[2]);
+		
 		pthread_mutex_unlock(&mux_state);
 		
-		rectfill(buffer, 51, 51, 149, 149, makecol(0,0,0));
-		rectfill(buffer, 51, 451, 149, 549, makecol(0,0,0));
-		rectfill(buffer, 51, 251, 149, 349, makecol(0,0,0));
+		pthread_mutex_lock(&mux_plt);
+		rectfill(buffer_gfx, 696, 286, GRAPH_XPOS_XCOORD - 1, GRAPH_XPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 391, GRAPH_YPOS_XCOORD - 1, GRAPH_YPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 496, GRAPH_ZPOS_XCOORD - 1, GRAPH_ZPOS_YCOORD - 1, makecol(0,0,0));
 		
-		update_graph(buffer, arr_graph_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);		
-		update_graph(buffer, arr_graph_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
-		update_graph(buffer, arr_graph_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
+		
+		update_graph(buffer_gfx, plt_buf_Roll, GRAPH_XPOS_XCOORD - 115, GRAPH_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Pitch, GRAPH_YPOS_XCOORD - 115, GRAPH_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Yaw, GRAPH_ZPOS_XCOORD - 115, GRAPH_ZPOS_YCOORD);
+		
+		update_graph(buffer_gfx, plt_buf_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+		
+		pthread_mutex_unlock(&mux_plt);
 
-		blit(buffer,screen,0,0,0,0,SCREEN_W, SCREEN_H);
-		
 		if (deadline_miss (tp))		
-			printf ("DEADLINE MISS: gfx_task()\n");
+			printf ("DEADLINE MISS: plt_task()\n");
 
 		//readkey();
 		wait_for_period (tp);
 
 	}
-	
-	close_allegro ();
 	
 	pthread_exit(0);	
 }
