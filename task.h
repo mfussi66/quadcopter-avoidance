@@ -11,9 +11,18 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <time.h>
+#include <string.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
+
+/* --- Definitions --- */
+
+#define TP_GFX 200
+#define TP_PLOTS 125
+#define TP_MODEL 20
+#define TP_LQR 100
+#define TP_KEY 1000
 
 /* --- Project functions --- */
 

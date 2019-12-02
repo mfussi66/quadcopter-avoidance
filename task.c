@@ -88,7 +88,10 @@ int ret = -1;
 	ret = pthread_create (tid, &att, task, tp);
 	
 	if (ret != 0)
+    {
 		printf ("!! - Error %d creating task() - !!\n", ret);
+        printf("%s\n", strerror(ret));
+    }
 	
 	return ret;
 

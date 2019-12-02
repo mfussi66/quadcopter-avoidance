@@ -15,10 +15,14 @@ float w_lift_off = 0.0;
 float yawref = 0.0;
 
 int gfx_initialized = 0;
-int gfx_closed = 0;
+int key_initialized = 0;
+int gfx_enabled = 0;
+int key_enabled = 0;
 
 BITMAP* buffer_plt;
 BITMAP* buffer_gfx;
+
+char scan;
 
 /* Semaphores */
 
@@ -31,6 +35,7 @@ pthread_mutexattr_t muxattr;
 /* tasks  declaration */
 void* lqr_task (void* arg);
 void *lin_model_task (void *arg);
+void *key_task (void *arg);
 void *gfx_task (void *arg);
 void *plt_task (void *arg);
 
@@ -39,10 +44,10 @@ void *plt_task (void *arg);
 int main (int argc, char **argv) 
 {
 
-struct sched_param sched_mod, sched_gfx, sched_lqr, sched_plt;
-struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt;
-pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt;
-pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt;
+struct sched_param sched_mod, sched_gfx, sched_lqr, sched_plt, sched_key;
+struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt, tp_key;
+pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt, attr_key;
+pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt, tid_key;
 
 int ret = 0;
 
@@ -54,55 +59,69 @@ int ret = 0;
 	
 	//Create Graphics Thread
     
-	tp_gfx.arg = 4;
-	tp_gfx.period = TPERIOD_GFX;
-	tp_gfx.deadline = TPERIOD_GFX * 0.5;
+	tp_gfx.arg = 1;
+	tp_gfx.period = TP_GFX;
+	tp_gfx.deadline = TP_GFX * 0.8;
 	tp_gfx.priority = 31;
 	tp_gfx.dmiss = 0;
 
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
 
-
-	//Create Plotting Thread
+   	//Create Keyboard Thread
     
-	tp_plt.arg = 2;
-	tp_plt.period = TPERIOD_PLOTS;
-	tp_plt.deadline = TPERIOD_PLOTS * 0.5;
-	tp_plt.priority = 30;
-	tp_plt.dmiss = 0;
+	tp_key.arg = 2;
+	tp_key.period = TP_KEY;
+	tp_key.deadline = TP_KEY * 0.9;
+	tp_key.priority = 35;
+	tp_key.dmiss = 0;
 
-	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
+	ret = thread_create (&tp_key, &sched_key, attr_key, &tid_key, key_task);
+
 
     //Create Dynamic Model Thread
     
-	tp_mod.arg = 1;
-	tp_mod.period = TPERIOD_MODEL;
-	tp_mod.deadline = TPERIOD_MODEL * 0.9;
-	tp_mod.priority = 22;
+	tp_mod.arg = 3;
+	tp_mod.period = TP_MODEL;
+	tp_mod.deadline = TP_MODEL * 0.9;
+	tp_mod.priority = 20;
 	tp_mod.dmiss = 0;
 
 	ret = thread_create (&tp_mod, &sched_mod, attr_mod, &tid_mod, lin_model_task);
 	
     //Create LQR Thread
     
-	tp_lqr.arg = 3;
-	tp_lqr.period = TPERIOD_LQR;
-	tp_lqr.deadline = TPERIOD_LQR * 0.5;
-	tp_lqr.priority = 23;
+	tp_lqr.arg = 4;
+	tp_lqr.period = TP_LQR;
+	tp_lqr.deadline = TP_LQR * 0.9;
+	tp_lqr.priority = 21;
 	tp_lqr.dmiss = 0;
 
 	ret = thread_create (&tp_lqr, &sched_lqr, attr_lqr, &tid_lqr, lqr_task);
+    
+    //Create Plotting Thread
+    
+	tp_plt.arg = 5;
+	tp_plt.period = TP_PLOTS;
+	tp_plt.deadline = TP_PLOTS * 0.9;
+	tp_plt.priority = 38;
+	tp_plt.dmiss = 0;
 
-	pthread_join (tid_mod, 0);
-	pthread_join (tid_lqr, 0);
+	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
+    
+    pthread_join (tid_plt, 0);
+    pthread_join (tid_lqr, 0);
+    pthread_join (tid_mod, 0);
+    pthread_join (tid_key, 0);
 	pthread_join (tid_gfx, 0);
-	pthread_join (tid_plt, 0);
-		
-    pthread_attr_destroy (&attr_mod);	
+
+    pthread_attr_destroy (&attr_plt);
 	pthread_attr_destroy (&attr_lqr);
-	pthread_attr_destroy (&attr_gfx);
-	pthread_attr_destroy (&attr_plt);
+    pthread_attr_destroy (&attr_mod);	
+    pthread_attr_destroy (&attr_key);
+    pthread_attr_destroy (&attr_gfx);
+
 	return 0;
+    
 }
 
 
@@ -119,21 +138,22 @@ struct task_par *tp;
 	gsl_matrix *A = gsl_matrix_calloc(SIZE_X, SIZE_X);
 	gsl_matrix *B = gsl_matrix_calloc(SIZE_X, SIZE_U);
 
-	double val = 0.0;
-
-	read_matrix_file("A.bin", A);
-	read_matrix_file("B.bin", B);
-	
-	while(gfx_initialized == 0)
-	{
+	do{
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
 		wait_for_period (tp);
-	}
+	}while(key_enabled == 0 && gfx_enabled == 0);
+    
+    read_matrix_file("A.bin", A);
+	read_matrix_file("B.bin", B);
+    
+    printf("Dynamic model task started\n");
 
-	while ( keypressed() == 0)
-    {		
+    do{
+        		
+        printf("Dynamic model is working\n");
+               
 		pthread_mutex_lock (&mux_forces);
 		
 		for(int i = 0; i < SIZE_U; i++)
@@ -143,27 +163,34 @@ struct task_par *tp;
 
 		quad_linear_model(forces, A, B, state);
 		
+        printf("Dynamic model is working\n");
+        
 		pthread_mutex_lock (&mux_state);
-
+        
+        printf("Dynamic model is working\n");
+        
 		for(int i = 0; i < SIZE_X; i++)
 		{
 			arr_state[i] = gsl_vector_get(state, i);
 		}
 		
 		pthread_mutex_unlock (&mux_state);
-		
+
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
 		wait_for_period (tp);
 
-	}
+	}while(scan != KEY_ESC);
 	
-	gsl_vector_free(state);
-	gsl_vector_free(forces);
-	gsl_matrix_free(A);
-	gsl_matrix_free(B);
-	
+    if (gfx_enabled == 0 && key_enabled == 0)
+    {
+        gsl_vector_free(state);
+        gsl_vector_free(forces);
+        gsl_matrix_free(A);
+        gsl_matrix_free(B);
+    }
+    
 	pthread_exit(0);
 
 }
@@ -186,23 +213,23 @@ void* lqr_task(void* arg)
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
-
-	read_matrix_file("K.bin", K);
 	
-	gsl_vector_set(setpoint, 3, 1);
-	gsl_vector_set(setpoint, 4, 1);
-	gsl_vector_set(setpoint, 5, 1);
-	
-	while(gfx_initialized == 0)
-	{
+	do{
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-	}
+	}while(key_enabled == 0 && gfx_enabled == 0);
+    
+    printf("LQR Controller task started\n");
 	
-	while(keypressed() == 0)
-	{
+    read_matrix_file("K.bin", K);
+	
+	gsl_vector_set(setpoint, 3, 1);
+	gsl_vector_set(setpoint, 4, 1);
+	gsl_vector_set(setpoint, 5, 1);
+    
+	do{
 		pthread_mutex_lock (&mux_state);
 		
 		for(int i = 0; i < SIZE_X; i++)
@@ -224,13 +251,16 @@ void* lqr_task(void* arg)
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-	}
+	}while(scan != KEY_ESC);
 	
-	gsl_vector_free(state);
-	gsl_vector_free(forces);
-	gsl_vector_free(setpoint);
-	gsl_matrix_free(K);
-	
+    if(key_enabled == 0 && gfx_enabled == 0)
+    {
+        gsl_vector_free(state);
+        gsl_vector_free(forces);
+        gsl_vector_free(setpoint);
+        gsl_matrix_free(K);
+    }
+    
 	pthread_exit(0);
 	
 }
@@ -253,8 +283,11 @@ int col;
 	set_period (tp);
 	
 	start_allegro();
-	
+
+    gfx_enabled = 1;
+    
 	pthread_mutex_lock(&mux_plt);
+    
 	buffer_gfx = create_bitmap(SCREEN_W, SCREEN_H);
 	
 	col = makecol(0, 255, 0);
@@ -262,11 +295,8 @@ int col;
 	rect(buffer_gfx, 5, 5, 560, 595, col);
 	
 	pthread_mutex_unlock(&mux_plt);
-	
-	gfx_initialized = 1;
-	
-	while(keypressed() == 0)
-	{
+    
+	do{
 		pthread_mutex_lock(&mux_plt);
 		
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
@@ -277,11 +307,12 @@ int col;
 			printf ("DEADLINE MISS: gfk_task()\n");
 		
 		wait_for_period (tp);
-	}
+        
+	}while(key_enabled == 1);
 	
-	gfx_closed = 1;
-	
-	close_allegro ();
+    close_allegro ();
+    
+	gfx_enabled = 0;
 	
 	pthread_exit(0);
 }
@@ -310,13 +341,15 @@ int col;
 	
 	set_period (tp);
 	
-	while(gfx_initialized == 0)
-	{
+	
+	do{
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: plt_task()\n");
 		
 		wait_for_period (tp);
-	}
+	}while(key_enabled == 0 && gfx_enabled == 0);
+    
+    printf("Plotting task started\n");
 	
 	col = makecol(0, 255, 0);
 
@@ -340,8 +373,8 @@ int col;
 	textout_centre_ex(buffer_gfx, font, "Z", 690, 545, col, -1);
 	pthread_mutex_unlock(&mux_plt);
 	
-	while(keypressed() == 0 && gfx_closed ==0)
-	{
+	
+	do{
 		pthread_mutex_lock(&mux_state);
 		
 		shift_and_append(plt_buf_X, GRAPH_DATA_SIZE, arr_state[3]);
@@ -376,10 +409,52 @@ int col;
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: plt_task()\n");
 
-		//readkey();
 		wait_for_period (tp);
 
-	}
+	}while(gfx_enabled && key_enabled);
 	
 	pthread_exit(0);	
+}
+
+/*
+ * Task
+ * -----------------
+ * Used for keyboard events
+ * 
+ */
+void* key_task(void* arg)
+{
+    
+    struct task_par *tp;
+	
+
+    
+    tp = (struct task_par *)arg;
+	
+	set_period (tp);
+    
+    key_enabled = 1;
+
+    do{
+        
+        scan = 0;
+        
+        if (keypressed())
+            scan = readkey() >> 8;
+        
+        if (deadline_miss(tp))		
+                printf ("DEADLINE MISS: key_task()\n");
+
+        wait_for_period (tp);
+
+	}while(scan != KEY_ESC);
+    
+    if(scan == KEY_ESC)
+    {
+        printf("ESCAPE key was pressed: Closing simulation\n");
+        key_enabled = 0;
+    }
+    
+	pthread_exit(0);
+    
 }
