@@ -1,14 +1,9 @@
 /* Data structures and constants definition */
 
-#ifndef CUSTOMDATA_H_INCLUDED_
-#define CUSTOMDATA_H_INCLUDED_
+#ifndef CUSTOMDATA_H
+#define CUSTOMDATA_H
 
 /* --- Project Constants --- */
-
-#define TPERIOD_GFX 200
-#define TPERIOD_PLOTS 125
-#define TPERIOD_MODEL 20
-#define TPERIOD_LQR 100
 
 #define NT 4
 #define N_SAMPLES 2
