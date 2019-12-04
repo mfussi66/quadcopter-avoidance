@@ -11,7 +11,7 @@
 #include "customdata.h"
 
 #define ENV_OFFSET_X 20
-#define ENV_OFFSET_Y 20
+#define ENV_OFFSET_Y 575
 #define ENV_SCALE 40
 
 #define PLT_DATA_SIZE 50
@@ -26,11 +26,11 @@
 
 /* Graphics */
 
-void start_allegro (void);
+void start_allegro(void);
 
-void close_allegro (void);
+void close_allegro(void);
 
-void update_graph (BITMAP* bmp, double* data, int coord_x, int coord_y);
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y);
 
-void update_pose (BITMAP* bmp, double* old, double* new);
+void update_pose(BITMAP* bmp, double* old, double* new);
 #endif

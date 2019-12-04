@@ -11,8 +11,7 @@ void start_allegro (void)
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_AUTODETECT_WINDOWED, 800, 600, 0, 0);
-    
+	set_gfx_mode (GFX_XWINDOWS, 800, 600, 0, 0);
     install_keyboard();
     
     clear_to_color (screen, 0);
@@ -31,17 +30,17 @@ void close_allegro(void)
     printf("Graphics: Allegro is closed\n");
 }
 
-void update_graph (BITMAP* bmp, double* data, int coord_x, int coord_y)
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
 {
 	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
-	int y = coord_y - (int)(data[0] * PLT_SCALE);
+	int y = coord_y - (int)(data[0] * PLT_SCALE / 2) - 50;
 	int x_prev = x;
 	int y_prev = y;
 	
 	for(int i = 0; i < PLT_DATA_SIZE; i++)
 	{
 		x = x + PLT_STEP;
-		y = coord_y - (int)(data[i] * PLT_SCALE);
+		y = coord_y - (int)(data[i] * PLT_SCALE / 2) - 50;
 		
 		if(data[i] >  0.0)
 			fastline(bmp, x_prev, y_prev, x, y, makecol(0, 255, 0));
@@ -51,14 +50,14 @@ void update_graph (BITMAP* bmp, double* data, int coord_x, int coord_y)
 	}
 }
 
-void update_pose (BITMAP* bmp, double* old, double* new)
+void update_pose(BITMAP* bmp, double* old, double* new)
 {
     
-    int old_x = ENV_OFFSET_X + (int)(ENV_SCALE * old[3]);
-    int old_y = ENV_OFFSET_Y + (int)(ENV_SCALE * old[4]);
+    int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);
+    int old_y = ENV_OFFSET_Y - (int) (ENV_SCALE * old[4]);
 
-    int x = ENV_OFFSET_X + (int)(ENV_SCALE * new[3]);
-    int y = ENV_OFFSET_Y + (int)(ENV_SCALE * new[4]);
+    int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
+    int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
     
     int tr1_1_x = old_x - 12;
     int tr1_1_y = old_y - 12;
