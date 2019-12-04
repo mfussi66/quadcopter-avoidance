@@ -8,6 +8,7 @@
 /* global vars */
 
 double arr_state[SIZE_X] = {0.0};
+double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
 double arr_error[SIZE_X] = {0.0};
 
@@ -106,15 +107,15 @@ int ret = 0;
 	tp_plt.priority = 38;
 	tp_plt.dmiss = 0;
 
-	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
+	//ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
     
-    pthread_join (tid_plt, 0);
+    //pthread_join (tid_plt, 0);
     pthread_join (tid_lqr, 0);
     pthread_join (tid_mod, 0);
     pthread_join (tid_key, 0);
 	pthread_join (tid_gfx, 0);
 
-    pthread_attr_destroy (&attr_plt);
+    //pthread_attr_destroy (&attr_plt);
 	pthread_attr_destroy (&attr_lqr);
     pthread_attr_destroy (&attr_mod);	
     pthread_attr_destroy (&attr_key);
@@ -151,24 +152,23 @@ struct task_par *tp;
     printf("Dynamic model task started\n");
 
     do{
-        		
-        printf("Dynamic model is working\n");
-               
+
 		pthread_mutex_lock (&mux_forces);
 		
 		for(int i = 0; i < SIZE_U; i++)
 			gsl_vector_set(forces,i, arr_forces[i]);
 
 		pthread_mutex_unlock (&mux_forces);
-
+        
+        pthread_mutex_lock (&mux_state);
+        
+        for(int i = 0; i < SIZE_X; i++)
+		{
+			arr_old_state[i] = arr_state[i];
+		}
+		        
 		quad_linear_model(forces, A, B, state);
-		
-        printf("Dynamic model is working\n");
-        
-		pthread_mutex_lock (&mux_state);
-        
-        printf("Dynamic model is working\n");
-        
+
 		for(int i = 0; i < SIZE_X; i++)
 		{
 			arr_state[i] = gsl_vector_get(state, i);
@@ -277,6 +277,8 @@ void* gfx_task(void* arg)
 struct task_par *tp;
 
 int col;
+double old_pose[6] = {0.0};
+double curr_pose[6] = {0.0};
 
 	tp = (struct task_par *)arg;
 	
@@ -297,10 +299,24 @@ int col;
 	pthread_mutex_unlock(&mux_plt);
     
 	do{
-		pthread_mutex_lock(&mux_plt);
+        
+        pthread_mutex_lock(&mux_state);
+
+        for(int i = 0; i < SIZE_Y; i++)
+            old_pose[i] = curr_pose[i];
+        
+        for(int i = 0; i < SIZE_Y; i++)
+            curr_pose[i] = arr_state[i];
+        
+        update_pose(buffer_gfx, old_pose,curr_pose);
+        
+        pthread_mutex_unlock(&mux_state);        
+		
+        pthread_mutex_lock(&mux_plt);
 		
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-
+             
+        
 		pthread_mutex_unlock(&mux_plt);
 		
 		if (deadline_miss (tp))
@@ -328,12 +344,12 @@ void* plt_task(void* arg)
 	
 struct task_par *tp;
 
-double plt_buf_Roll[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Pitch[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Yaw[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_X[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Y[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Z[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Roll[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Pitch[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Yaw[PLT_DATA_SIZE] = {0.0};
+double plt_buf_X[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Y[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Z[PLT_DATA_SIZE] = {0.0};
 
 int col; 
 
@@ -356,9 +372,9 @@ int col;
 	pthread_mutex_lock(&mux_plt);	
 	buffer_plt = create_bitmap(SCREEN_W, SCREEN_H);
 
-	rect(buffer_gfx, 695, 285, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 390, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 495, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
 	
 	rect(buffer_gfx, 580, 285, 680, 385, col);
 	rect(buffer_gfx, 580, 390, 680, 490, col);
@@ -377,32 +393,32 @@ int col;
 	do{
 		pthread_mutex_lock(&mux_state);
 		
-		shift_and_append(plt_buf_X, GRAPH_DATA_SIZE, arr_state[3]);
-		shift_and_append(plt_buf_Z, GRAPH_DATA_SIZE, arr_state[5]);
-		shift_and_append(plt_buf_Y, GRAPH_DATA_SIZE, arr_state[4]);
+		shift_and_append(plt_buf_X, PLT_DATA_SIZE, arr_state[3]);
+		shift_and_append(plt_buf_Z, PLT_DATA_SIZE, arr_state[5]);
+		shift_and_append(plt_buf_Y, PLT_DATA_SIZE, arr_state[4]);
 		
-		shift_and_append(plt_buf_Roll, GRAPH_DATA_SIZE, arr_state[0]);
-		shift_and_append(plt_buf_Pitch, GRAPH_DATA_SIZE, arr_state[1]);
-		shift_and_append(plt_buf_Yaw, GRAPH_DATA_SIZE, arr_state[2]);
+		shift_and_append(plt_buf_Roll, PLT_DATA_SIZE, arr_state[0]);
+		shift_and_append(plt_buf_Pitch, PLT_DATA_SIZE, arr_state[1]);
+		shift_and_append(plt_buf_Yaw, PLT_DATA_SIZE, arr_state[2]);
 		
 		pthread_mutex_unlock(&mux_state);
 		
 		pthread_mutex_lock(&mux_plt);
-		rectfill(buffer_gfx, 696, 286, GRAPH_XPOS_XCOORD - 1, GRAPH_XPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 391, GRAPH_YPOS_XCOORD - 1, GRAPH_YPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 496, GRAPH_ZPOS_XCOORD - 1, GRAPH_ZPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, makecol(0,0,0));
 		
 		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
 		
-		update_graph(buffer_gfx, plt_buf_Roll, GRAPH_XPOS_XCOORD - 115, GRAPH_XPOS_YCOORD);		
-		update_graph(buffer_gfx, plt_buf_Pitch, GRAPH_YPOS_XCOORD - 115, GRAPH_YPOS_YCOORD);
-		update_graph(buffer_gfx, plt_buf_Yaw, GRAPH_ZPOS_XCOORD - 115, GRAPH_ZPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Yaw, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD);
 		
-		update_graph(buffer_gfx, plt_buf_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);		
-		update_graph(buffer_gfx, plt_buf_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
-		update_graph(buffer_gfx, plt_buf_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_X, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Y, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD);
 		
 		pthread_mutex_unlock(&mux_plt);
 
@@ -426,9 +442,7 @@ void* key_task(void* arg)
 {
     
     struct task_par *tp;
-	
-
-    
+	    
     tp = (struct task_par *)arg;
 	
 	set_period (tp);
