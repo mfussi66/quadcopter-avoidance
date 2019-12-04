@@ -1,0 +1,7 @@
+.kdev4/
+main
+main.o
+task.o
+model.o
+graphics.o
+quadcopter-avoidance.kdev4
