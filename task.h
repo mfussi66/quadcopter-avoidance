@@ -18,11 +18,11 @@
 
 /* --- Definitions --- */
 
-#define TP_GFX 200
+#define TP_GFX 100
 #define TP_PLOTS 125
 #define TP_MODEL 20
 #define TP_LQR 100
-#define TP_KEY 1000
+#define TP_KEY 750
 
 /* --- Project functions --- */
 

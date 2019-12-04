@@ -81,7 +81,7 @@ int ret = -1;
 
 	pthread_attr_init (&att);
 	pthread_attr_setinheritsched (&att, PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy (&att, SCHED_RR);
+	pthread_attr_setschedpolicy (&att, SCHED_FIFO);
 
 	sp->sched_priority = tp->priority;
 	pthread_attr_setschedparam (&att, sp);
