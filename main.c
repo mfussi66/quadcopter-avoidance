@@ -328,12 +328,12 @@ void* plt_task(void* arg)
 	
 struct task_par *tp;
 
-double plt_buf_Roll[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Pitch[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Yaw[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_X[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Y[GRAPH_DATA_SIZE] = {0.0};
-double plt_buf_Z[GRAPH_DATA_SIZE] = {0.0};
+double plt_buf_Roll[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Pitch[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Yaw[PLT_DATA_SIZE] = {0.0};
+double plt_buf_X[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Y[PLT_DATA_SIZE] = {0.0};
+double plt_buf_Z[PLT_DATA_SIZE] = {0.0};
 
 int col; 
 
@@ -356,9 +356,9 @@ int col;
 	pthread_mutex_lock(&mux_plt);	
 	buffer_plt = create_bitmap(SCREEN_W, SCREEN_H);
 
-	rect(buffer_gfx, 695, 285, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 390, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 495, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
+	rect(buffer_gfx, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
 	
 	rect(buffer_gfx, 580, 285, 680, 385, col);
 	rect(buffer_gfx, 580, 390, 680, 490, col);
@@ -377,32 +377,32 @@ int col;
 	do{
 		pthread_mutex_lock(&mux_state);
 		
-		shift_and_append(plt_buf_X, GRAPH_DATA_SIZE, arr_state[3]);
-		shift_and_append(plt_buf_Z, GRAPH_DATA_SIZE, arr_state[5]);
-		shift_and_append(plt_buf_Y, GRAPH_DATA_SIZE, arr_state[4]);
+		shift_and_append(plt_buf_X, PLT_DATA_SIZE, arr_state[3]);
+		shift_and_append(plt_buf_Z, PLT_DATA_SIZE, arr_state[5]);
+		shift_and_append(plt_buf_Y, PLT_DATA_SIZE, arr_state[4]);
 		
-		shift_and_append(plt_buf_Roll, GRAPH_DATA_SIZE, arr_state[0]);
-		shift_and_append(plt_buf_Pitch, GRAPH_DATA_SIZE, arr_state[1]);
-		shift_and_append(plt_buf_Yaw, GRAPH_DATA_SIZE, arr_state[2]);
+		shift_and_append(plt_buf_Roll, PLT_DATA_SIZE, arr_state[0]);
+		shift_and_append(plt_buf_Pitch, PLT_DATA_SIZE, arr_state[1]);
+		shift_and_append(plt_buf_Yaw, PLT_DATA_SIZE, arr_state[2]);
 		
 		pthread_mutex_unlock(&mux_state);
 		
 		pthread_mutex_lock(&mux_plt);
-		rectfill(buffer_gfx, 696, 286, GRAPH_XPOS_XCOORD - 1, GRAPH_XPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 391, GRAPH_YPOS_XCOORD - 1, GRAPH_YPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 496, GRAPH_ZPOS_XCOORD - 1, GRAPH_ZPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, makecol(0,0,0));
 		
 		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
 		
-		update_graph(buffer_gfx, plt_buf_Roll, GRAPH_XPOS_XCOORD - 115, GRAPH_XPOS_YCOORD);		
-		update_graph(buffer_gfx, plt_buf_Pitch, GRAPH_YPOS_XCOORD - 115, GRAPH_YPOS_YCOORD);
-		update_graph(buffer_gfx, plt_buf_Yaw, GRAPH_ZPOS_XCOORD - 115, GRAPH_ZPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Yaw, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD);
 		
-		update_graph(buffer_gfx, plt_buf_X, GRAPH_XPOS_XCOORD, GRAPH_XPOS_YCOORD);		
-		update_graph(buffer_gfx, plt_buf_Y, GRAPH_YPOS_XCOORD, GRAPH_YPOS_YCOORD);
-		update_graph(buffer_gfx, plt_buf_Z, GRAPH_ZPOS_XCOORD, GRAPH_ZPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_X, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD);		
+		update_graph(buffer_gfx, plt_buf_Y, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD);
+		update_graph(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD);
 		
 		pthread_mutex_unlock(&mux_plt);
 
