@@ -239,9 +239,9 @@ void* lqr_task(void* arg)
 	
     read_matrix_file("K.bin", K);
 	
-	gsl_vector_set(setpoint, 3, 1);
-	gsl_vector_set(setpoint, 4, 1);
-	gsl_vector_set(setpoint, 5, 1);
+	gsl_vector_set(setpoint, 3, 10);
+	gsl_vector_set(setpoint, 4, 10);
+	gsl_vector_set(setpoint, 5, 10);
     
 	do{
 		pthread_mutex_lock (&mux_state);
@@ -341,9 +341,16 @@ double curr_pose[6] = {0.0};
 		wait_for_period (tp);
         
 	}while(key_enabled == 1);
+
+	clear_to_color(buffer_gfx, 0);
 	
-    //close_allegro ();
-    
+	textout_centre_ex(buffer_gfx,font,"--- Simulation ended ---", 
+					  400, 300, col, -1);
+	
+	blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
+	
+	usleep(3e6);
+
 	gfx_enabled = 0;
 	
 	pthread_exit(0);

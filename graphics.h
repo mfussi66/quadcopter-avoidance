@@ -14,9 +14,9 @@
 #define ENV_OFFSET_Y 575
 #define ENV_SCALE 40
 
-#define PLT_DATA_SIZE 50
-#define PLT_STEP 2
-#define PLT_SCALE 75
+#define PLT_DATA_SIZE 25
+#define PLT_STEP 4
+#define PLT_SCALE 5
 #define PLT_XPOS_XCOORD 795
 #define PLT_XPOS_YCOORD 385
 #define PLT_YPOS_XCOORD 795
