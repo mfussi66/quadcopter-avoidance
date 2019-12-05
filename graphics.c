@@ -50,6 +50,36 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
 	}
 }
 
+void build_gui(BITMAP* bmp, FONT* font, int col)
+{
+	rect(bmp, 5, 5, 560, 595, col);
+	
+	rect(bmp, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
+	rect(bmp, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
+	rect(bmp, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
+	
+	rect(bmp, 580, 285, 680, 385, col);
+	rect(bmp, 580, 390, 680, 490, col);
+	rect(bmp, 580, 495, 680, 595, col);
+	
+	textout_centre_ex(bmp, font, "R", 575, 335, col, -1);
+	textout_centre_ex(bmp, font, "P", 575, 440, col, -1);
+	textout_centre_ex(bmp, font, "Y", 575, 545, col, -1);
+	
+	textout_centre_ex(bmp, font, "X", 690, 335, col, -1);
+	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
+	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);	
+
+}
+
+void draw_exit_screen(BITMAP* bmp, int col)
+{
+	textout_centre_ex(bmp, font, "_________________________", 400, 287, col, -1);
+	textout_centre_ex(bmp, font, "   Simulation stopped    ", 400, 300, col, -1);
+	textout_centre_ex(bmp, font, "  Thank you for playing  ", 400, 310, col, -1);
+	textout_centre_ex(bmp, font, "_________________________", 400, 315, col, -1);	
+}
+
 void update_pose(BITMAP* bmp, double* old, double* new)
 {
     

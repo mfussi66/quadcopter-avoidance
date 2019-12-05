@@ -30,6 +30,10 @@ void start_allegro(void);
 
 void close_allegro(void);
 
+void build_gui(BITMAP* bmp, FONT* font, int col);
+
+void draw_exit_screen(BITMAP* bmp, int col);
+
 void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y);
 
 void update_pose(BITMAP* bmp, double* old, double* new);

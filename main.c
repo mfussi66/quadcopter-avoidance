@@ -20,7 +20,6 @@ int key_initialized = 0;
 int gfx_enabled = 0;
 int key_enabled = 0;
 
-BITMAP* buffer_plt;
 BITMAP* buffer_gfx;
 
 char scan;
@@ -85,7 +84,7 @@ int ret = 0;
     
 	tp_mod.arg = 3;
 	tp_mod.period = TP_MODEL;
-	tp_mod.deadline = TP_MODEL * 6;
+	tp_mod.deadline = TP_MODEL * 3;
 	tp_mod.priority = 20;
 	tp_mod.dmiss = 0;
 
@@ -167,18 +166,12 @@ struct task_par *tp;
 		
         forces = gsl_vector_view_array(arr_forces, SIZE_U);
         
-// 		for(int i = 0; i < SIZE_U; i++)
-// 			gsl_vector_set(forces,i, arr_forces[i]);
-
 		pthread_mutex_unlock (&mux_forces);
         
         pthread_mutex_lock (&mux_state);
         
-        for(int i = 0; i < SIZE_X; i++)
-		{
-			arr_old_state[i] = arr_state[i];
-		}
-		        
+		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
+		
 		quad_linear_model(&forces.vector, A, B, state);
 
 		for(int i = 0; i < SIZE_X; i++)
@@ -195,14 +188,10 @@ struct task_par *tp;
 
 	}while(scan != KEY_ESC);
 	
-    if (gfx_enabled == 0 && key_enabled == 0)
-    {
         gsl_vector_free(state);
-        //gsl_vector_free(forces);
         gsl_matrix_free(A);
         gsl_matrix_free(B);
-    }
-    
+
     printf("model task exited\n");
     
 	pthread_exit(0);
@@ -223,7 +212,7 @@ void* lqr_task(void* arg)
 	gsl_vector *forces = gsl_vector_calloc(SIZE_U);
 	gsl_vector *setpoint = gsl_vector_calloc(SIZE_X);
 	gsl_matrix *K = gsl_matrix_calloc(SIZE_U, SIZE_X);
-	
+	gsl_vector_view state_view;
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
@@ -244,36 +233,28 @@ void* lqr_task(void* arg)
 	gsl_vector_set(setpoint, 5, 10);
     
 	do{
+		
 		pthread_mutex_lock (&mux_state);
-		
-		for(int i = 0; i < SIZE_X; i++)
-			gsl_vector_set(state, i, arr_state[i]);
-			//printf("arr_state: %lf\n",arr_state[5]);
-		
+		state_view = gsl_vector_view_array(arr_state, SIZE_X);
 		pthread_mutex_unlock (&mux_state);
 		
-		dlqr_control(setpoint, state, K, forces);
+		dlqr_control(setpoint, &state_view.vector, K, forces);
 
 		pthread_mutex_lock (&mux_forces);
-		
-		for(int i = 0; i < SIZE_U; i++)
-			arr_forces[i] = gsl_vector_get(forces, i);
-		
+		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock (&mux_forces);
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
+		
 	}while(scan != KEY_ESC);
-	
-    if(key_enabled == 0 && gfx_enabled == 0)
-    {
-        gsl_vector_free(state);
-        gsl_vector_free(forces);
-        gsl_vector_free(setpoint);
-        gsl_matrix_free(K);
-    }
+
+	gsl_vector_free(state);
+	gsl_vector_free(forces);
+	gsl_vector_free(setpoint);
+	gsl_matrix_free(K);
     
     printf("lqr task exited\n");
     
@@ -292,43 +273,31 @@ void* gfx_task(void* arg)
 	
 struct task_par *tp;
 
-int col;
+int gui_color =  makecol(0, 255, 0);
 double old_pose[6] = {0.0};
 double curr_pose[6] = {0.0};
 
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
-	
-	//start_allegro();
 
     gfx_enabled = 1;
-    
-	pthread_mutex_lock(&mux_plt);
-    
+
 	buffer_gfx = create_bitmap(SCREEN_W, SCREEN_H);
+	
 	clear_to_color(buffer_gfx, 0);
-    
-	col = makecol(0, 255, 0);
-	
-	rect(buffer_gfx, 5, 5, 560, 595, col);
-	
-	pthread_mutex_unlock(&mux_plt);
+
+	build_gui(buffer_gfx, font, gui_color);
     
 	do{
         
-        pthread_mutex_lock(&mux_state);
-
-        for(int i = 0; i < SIZE_Y; i++)
-            old_pose[i] = curr_pose[i];
-        
-        for(int i = 0; i < SIZE_Y; i++)
-            curr_pose[i] = arr_state[i];
-        
-        update_pose(buffer_gfx, old_pose,curr_pose);
-        
-        pthread_mutex_unlock(&mux_state);        
+		pthread_mutex_lock(&mux_state);
+		memcpy(old_pose, curr_pose, sizeof(double) * SIZE_Y);
+		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
+		pthread_mutex_unlock(&mux_state); 
 		
+		update_pose(buffer_gfx, old_pose, curr_pose);
+				
         pthread_mutex_lock(&mux_plt);
 		
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
@@ -344,12 +313,11 @@ double curr_pose[6] = {0.0};
 
 	clear_to_color(buffer_gfx, 0);
 	
-	textout_centre_ex(buffer_gfx,font,"--- Simulation ended ---", 
-					  400, 300, col, -1);
+	draw_exit_screen(buffer_gfx, gui_color);
 	
 	blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
 	
-	usleep(3e6);
+	usleep(5e6);
 
 	gfx_enabled = 0;
 	
@@ -376,14 +344,9 @@ double plt_buf_Z[PLT_DATA_SIZE] = {0.0};
 
 double new_pose[SIZE_Y] = {0.0};
 
-int col; 
-
-gsl_vector_view state_view;
-
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
-	
 	
 	do{
 		if (deadline_miss (tp))
@@ -393,35 +356,13 @@ gsl_vector_view state_view;
 	}while(key_enabled == 0 && gfx_enabled == 0);
     
     printf("Plotting task started\n");
-	
-	col = makecol(0, 255, 0);
 
-	pthread_mutex_lock(&mux_plt);	
-	buffer_plt = create_bitmap(SCREEN_W, SCREEN_H);
-
-	rect(buffer_gfx, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
-	rect(buffer_gfx, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
-	
-	rect(buffer_gfx, 580, 285, 680, 385, col);
-	rect(buffer_gfx, 580, 390, 680, 490, col);
-	rect(buffer_gfx, 580, 495, 680, 595, col);
-	
-	textout_centre_ex(buffer_gfx, font, "R", 575, 335, col, -1);
-	textout_centre_ex(buffer_gfx, font, "P", 575, 440, col, -1);
-	textout_centre_ex(buffer_gfx, font, "Y", 575, 545, col, -1);
-	
-	textout_centre_ex(buffer_gfx, font, "X", 690, 335, col, -1);
-	textout_centre_ex(buffer_gfx, font, "Y", 690, 440, col, -1);
-	textout_centre_ex(buffer_gfx, font, "Z", 690, 545, col, -1);
-	pthread_mutex_unlock(&mux_plt);
-	
-	
 	do{
+	
 		pthread_mutex_lock(&mux_state);
         
-        memcpy(new_pose, arr_state, sizeof(double) * SIZE_Y);
-        
+		memcpy(new_pose, arr_state, sizeof(double) * SIZE_Y);
+	
 		pthread_mutex_unlock(&mux_state);
         
 		shift_and_append(plt_buf_X, PLT_DATA_SIZE, new_pose[3]);
@@ -433,13 +374,13 @@ gsl_vector_view state_view;
 		shift_and_append(plt_buf_Yaw, PLT_DATA_SIZE, new_pose[2]);
     
 		pthread_mutex_lock(&mux_plt);
-		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, 0);
+		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, 0);
+		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, 0);
 		
-		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, 0);
+		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, 0);
+		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, 0);
 		
 		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD);		
 		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD);
