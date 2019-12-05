@@ -174,11 +174,8 @@ struct task_par *tp;
 		
 		quad_linear_model(&forces.vector, A, B, state);
 
-		for(int i = 0; i < SIZE_X; i++)
-		{
-			arr_state[i] = gsl_vector_get(state, i);
-		}
-		
+		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
+
 		pthread_mutex_unlock (&mux_state);
 
 		if (deadline_miss (tp))		
