@@ -37,4 +37,7 @@ void draw_exit_screen(BITMAP* bmp, int col);
 void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y);
 
 void update_pose(BITMAP* bmp, double* old, double* new);
+
+void draw_laser_traces(BITMAP* bmp, double* pose);
+
 #endif
