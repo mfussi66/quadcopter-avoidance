@@ -16,13 +16,6 @@
 typedef gsl_vector Vector;
 typedef gsl_matrix Matrix;
 
-typedef struct
-{
-	double x;
-	double y;
-	double z;
-} Trace;
-
 /* Model */
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);

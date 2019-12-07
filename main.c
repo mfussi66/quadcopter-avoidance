@@ -106,7 +106,7 @@ int ret = 0;
 	tp_lsr.arg = 6;
 	tp_lsr.period = TP_LSR;
 	tp_lsr.deadline = TP_LSR * 1;
-	tp_lsr.priority = 24;
+	tp_lsr.priority = 16;
 	tp_lsr.dmiss = 0;
 
 	ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
@@ -248,7 +248,6 @@ void* lqr_task(void* arg)
 		pthread_mutex_lock (&mux_state);
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
 
-		
 		dlqr_control(setpoint, &state_view.vector, K, forces);
 		pthread_mutex_unlock (&mux_state);
 		
@@ -277,13 +276,15 @@ void* lqr_task(void* arg)
 
 void* laser_task(void* arg)
 {
-	struct task_par* tp;
-	
-	double aperture;
-	int n_traces;
-	Trace laser_traces[5];
-	double initialpose[6] = {0.0};
-	double pose[6] = {0.0};
+struct task_par* tp;
+
+double aperture;
+int n_traces;
+Trace laser_traces[5];
+Trace old_traces[5];
+double initialpose[6] = {0.0};
+double old_pose[6] = {0.0};
+double pose[6] = {0.0};
 	
 	tp = (struct task_par *)arg;
 	
@@ -291,28 +292,33 @@ void* laser_task(void* arg)
 	n_traces = 5;
 	
 	set_period (tp);
-	
+		
 	init_laser_scanner(laser_traces, n_traces, aperture, initialpose);
 	
 	do{
-		
-		pthread_mutex_lock(&mux_state);
-		memcpy(pose, arr_state,  sizeof(double) * SIZE_Y);
-		pthread_mutex_unlock(&mux_state);
-		
-		//TODO
-		//get_laser_distances(laser_traces, pose);
-		
+
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
+
 	}while(key_enabled == 0 && gfx_enabled == 0);
     
     printf("Laser Scanner task started\n");
     
 	do{
+			
+		pthread_mutex_lock(&mux_state);
+		memcpy(old_pose, pose, sizeof(double) * SIZE_Y);
+		memcpy(pose, arr_state, sizeof(double) * SIZE_Y);
+		pthread_mutex_unlock(&mux_state);
+
+		pthread_mutex_lock(&mux_gfx);
+		memcpy(old_traces, laser_traces, sizeof(double) * 3 * n_traces);
+		get_laser_distances(buffer_gfx, laser_traces, pose, aperture);
 	
+		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
+		pthread_mutex_unlock(&mux_gfx);
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lsr_task()\n");
@@ -321,7 +327,6 @@ void* laser_task(void* arg)
 		
 	}while(scan != KEY_ESC);
 
-    
     printf("Laser Scanner task exited\n");
     
 	pthread_exit(0);
@@ -362,10 +367,10 @@ double curr_pose[6] = {0.0};
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
 		pthread_mutex_unlock(&mux_state); 
 		
-		update_pose(buffer_gfx, old_pose, curr_pose);
-				
+		draw_pose(buffer_gfx, old_pose, curr_pose);
+
         pthread_mutex_lock(&mux_gfx);
-		
+
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
              
 		pthread_mutex_unlock(&mux_gfx);

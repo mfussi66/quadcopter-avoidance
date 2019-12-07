@@ -72,6 +72,8 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 		tr[i].x = init_pose[3] + 100 * cos(angle * i);
 		tr[i].y = init_pose[4] - 12 + 100 * sin(angle * i);
 		tr[i].z = init_pose[5] + 100 * 0.0;
+		
+		printf("beam %d, x: %f, y: %f \n", i,tr[i].x,tr[i].y);
 	}
 	
 }
@@ -79,25 +81,37 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double aperture)
 {
 	double angle = aperture / (5 - 1);
-	double d;
+	int col = makecol(0, 255, 0);
+	int d_min = 2;
+	int d_max = 5;
+	int d_step = 1;
 	int obj_found;
+	Trace temp;
+	
 	for (int a = 0; a < 5; a++)
 	{
 		obj_found = 0;
-		d = 50;
-		while (d < 100 || obj_found == 0)
+		
+		for(int d = d_min; d < d_max; d += d_step)
 		{
+			temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + (double)d * cos(angle * (a + 1)));
+			temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + (double)d * sin(angle * (a + 1)));
+			temp.z = pose[5] - 0 * sin(angle * (a + 1));
 			
-			tr[a].x = pose[3] + d * cos(angle * (a + 1));
-			tr[a].y = pose[4] - d * sin(angle * (a + 1));
-			tr[a].z = pose[5] - 0 * sin(angle * (a + 1));
-		
-			d +=5;
+			temp.x = temp.x;
+			temp.y = temp.y;
 			
-			if (getpixel(bmp, tr[a].x, tr[a].y) == makecol(0,255,0))
+			if (getpixel(bmp, (int)temp.x, (int)temp.y) == col)
+			{
+				printf("Beam %d found: x: %f y: %f \n", a, temp.x, temp.y);
 				obj_found = 1;
+				break;
+			}
 		}
-		
+		//printf("beam %d, x: %f, y: %f \n", a, temp.x,temp.y);
+		tr[a].x = temp.x;
+		tr[a].y = temp.y;
+		tr[a].z = temp.z;
 	}
 }
 

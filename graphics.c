@@ -80,7 +80,42 @@ void draw_exit_screen(BITMAP* bmp, int col)
 	textout_centre_ex(bmp, font, "_________________________", 400, 315, col, -1);	
 }
 
-void update_pose(BITMAP* bmp, double* old, double* new)
+void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
+{
+	int col =  makecol(255, 0, 0);
+	
+	Trace temp;
+	int X[3] = {0.0};
+	int old_X[3] = {0.0};
+	
+	X[0] = (int)(ENV_OFFSET_X + ENV_SCALE * (pose[3]));
+	X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (pose[4]));
+	
+	old_X[0] = (int)(ENV_OFFSET_X + ENV_SCALE * (old_pose[3]));
+	old_X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (old_pose[4]));
+	
+	double angle = 120 / (5 - 1);
+	
+	for(int i = 0; i < 5; i++)
+	{
+		temp.x = ENV_OFFSET_X + ENV_SCALE * (old_pose[3]) + old[i].x;
+		temp.y = ENV_OFFSET_Y - (ENV_SCALE * (old_pose[4]) + old[i].y);
+		temp.z = old_pose[5] + old[i].z;
+		
+		fastline(bmp, old_X[0], old_X[1], (int)temp.x, (int)temp.y, makecol(0,0,0));
+
+		temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3]) + new[i].x;
+		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4]) - new[i].y;
+		temp.z = pose[5] + new[i].z;
+		
+		printf("print %d, x: %f, y: %f xd: %f yd: %f \n", i, temp.x,temp.y, new[i].x,new[i].y);
+		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, col);
+	}
+	printf("---\n");
+
+}
+
+void draw_pose(BITMAP* bmp, double* old, double* new)
 {
     
     int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);

@@ -12,7 +12,28 @@
 #define SIZE_U 4
 #define SIZE_Y 6
 
+#define ENV_OFFSET_X 20
+#define ENV_OFFSET_Y 575
+#define ENV_SCALE 10
+
+#define PLT_DATA_SIZE 25
+#define PLT_STEP 4
+#define PLT_SCALE 5
+#define PLT_XPOS_XCOORD 795
+#define PLT_XPOS_YCOORD 385
+#define PLT_YPOS_XCOORD 795
+#define PLT_YPOS_YCOORD 490
+#define PLT_ZPOS_XCOORD 795
+#define PLT_ZPOS_YCOORD 595
+
 /* --- Project Structures --- */
+
+typedef struct
+{
+	double x;
+	double y;
+	double z;
+} Trace;
 
 typedef struct servo_par {
 	int mid;				/* motor id */
