@@ -26,7 +26,7 @@ void compute_error(Vector *setpoint, Vector *state, Vector *result);
 
 void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 
-void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double aperture);
+void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n);
 
 double rad2deg(double n);
 

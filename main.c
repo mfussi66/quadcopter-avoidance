@@ -240,7 +240,7 @@ void* lqr_task(void* arg)
     read_matrix_file("K.bin", K);
 	
 	gsl_vector_set(setpoint, 3, 10);
-	gsl_vector_set(setpoint, 4, 10);
+	gsl_vector_set(setpoint, 4, 2);
 	gsl_vector_set(setpoint, 5, 10);
     
 	do{
@@ -288,7 +288,7 @@ double pose[6] = {0.0};
 	
 	tp = (struct task_par *)arg;
 	
-	aperture = deg2rad(120);
+	aperture = 150;
 	n_traces = 5;
 	
 	set_period (tp);
@@ -315,7 +315,7 @@ double pose[6] = {0.0};
 
 		pthread_mutex_lock(&mux_gfx);
 		memcpy(old_traces, laser_traces, sizeof(double) * 3 * n_traces);
-		get_laser_distances(buffer_gfx, laser_traces, pose, aperture);
+		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, n_traces);
 	
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
@@ -348,6 +348,9 @@ int gui_color =  makecol(0, 255, 0);
 double old_pose[6] = {0.0};
 double curr_pose[6] = {0.0};
 
+BITMAP* quad;
+BITMAP* quad_bg;
+
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
@@ -358,8 +361,14 @@ double curr_pose[6] = {0.0};
 	
 	clear_to_color(buffer_gfx, 0);
 
-	build_gui(buffer_gfx, font, gui_color);
-    
+	build_gui(buffer_gfx, font, COL_GREEN);
+	
+	quad = load_bmp("bmp/quad.bmp", NULL);
+	quad_bg = load_bmp("bmp/black.bmp", NULL);
+	
+	if(quad == NULL)
+		printf("Drone sprite not found!\n");
+	
 	do{
         
 		pthread_mutex_lock(&mux_state);
@@ -367,8 +376,11 @@ double curr_pose[6] = {0.0};
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
 		pthread_mutex_unlock(&mux_state); 
 		
-		draw_pose(buffer_gfx, old_pose, curr_pose);
-
+		if (quad != NULL)
+			draw_quad(buffer_gfx, quad, quad_bg, old_pose, curr_pose);
+		else
+			draw_pose(buffer_gfx, old_pose, curr_pose);
+		
         pthread_mutex_lock(&mux_gfx);
 
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);

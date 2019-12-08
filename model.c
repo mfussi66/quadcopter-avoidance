@@ -67,52 +67,57 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 {
 	double angle = aperture / (n - 1);
 	
-	for(int i = 1; i < n -1; i++)
+	for(int i = 0; i < n; i++)
 	{
-		tr[i].x = init_pose[3] + 100 * cos(angle * i);
-		tr[i].y = init_pose[4] - 12 + 100 * sin(angle * i);
-		tr[i].z = init_pose[5] + 100 * 0.0;
+		tr[i].x = 0.0;
+		tr[i].y = 0.0;
+		tr[i].z = 0.0;
 		
-		printf("beam %d, x: %f, y: %f \n", i,tr[i].x,tr[i].y);
+		//printf("beam %d, x: %f, y: %f \n", i,tr[i].x,tr[i].y);
 	}
 	
 }
 
-void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double aperture)
+void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n)
 {
-	double angle = aperture / (5 - 1);
+	int angle = spread / (n);
 	int col = makecol(0, 255, 0);
-	int d_min = 2;
-	int d_max = 5;
-	int d_step = 1;
+	int i = 0;
 	int obj_found;
 	Trace temp;
 	
-	for (int a = 0; a < 5; a++)
+	for (int a = angle; a <= spread; a += angle)
 	{
 		obj_found = 0;
 		
-		for(int d = d_min; d < d_max; d += d_step)
-		{
-			temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + (double)d * cos(angle * (a + 1)));
-			temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + (double)d * sin(angle * (a + 1)));
-			temp.z = pose[5] - 0 * sin(angle * (a + 1));
+		for(int d = BEAM_DMIN; d <= BEAM_DMAX; d += BEAM_DSTEP)
+		{	
+			temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + d * sin(deg2rad(a)));
+			temp.y = ENV_OFFSET_Y - OFFSET_LASER - ENV_SCALE * (pose[4] + d * cos(deg2rad(a)));
+			temp.z = pose[5] - 0 * sin(deg2rad(a));
 			
-			temp.x = temp.x;
-			temp.y = temp.y;
+			//printf("d: %d, a: %d x: %f, y: %f \n", d, a, temp.x,temp.y);
+			//printf("dist x: %lf y: %lf \n", d * cos(deg2rad(a)), d * sin(deg2rad(a)));
 			
-			if (getpixel(bmp, (int)temp.x, (int)temp.y) == col)
+			if (getpixel(bmp, (int)temp.x, (int)temp.y) ==  COL_GREEN)
 			{
-				printf("Beam %d found: x: %f y: %f \n", a, temp.x, temp.y);
+				//printf("Beam %d found col %d: x: %f y: %f \n", i + 1, col, temp.x, temp.y);
 				obj_found = 1;
 				break;
 			}
 		}
-		//printf("beam %d, x: %f, y: %f \n", a, temp.x,temp.y);
-		tr[a].x = temp.x;
-		tr[a].y = temp.y;
-		tr[a].z = temp.z;
+		//printf("beam %d, a: %d x: %f, y: %f \n", i, a, temp.x,temp.y);
+		if (i < n)
+		{
+			tr[i].x = (temp.x - ENV_OFFSET_X) / ENV_SCALE - pose[3];
+			tr[i].y = (temp.y - ENV_OFFSET_Y + OFFSET_LASER) / (- ENV_SCALE) - pose[4];
+			tr[i].z = temp.z;
+			if (obj_found)
+				printf("Beam %d: a: %d xd: %f yd: %f \n", i + 1, a, tr[i].x, tr[i].y);
+			i++;
+		}
 	}
+	//printf("<<<<<<\n");
 }
 
 double deg2rad(double n)

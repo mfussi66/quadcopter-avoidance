@@ -16,6 +16,13 @@
 #define ENV_OFFSET_Y 575
 #define ENV_SCALE 10
 
+#define OFFSET_LASER 12
+#define BEAM_DMIN 1
+#define BEAM_DMAX 10
+#define BEAM_DSTEP 2
+
+#define COL_GREEN 48
+
 #define PLT_DATA_SIZE 25
 #define PLT_STEP 4
 #define PLT_SCALE 5

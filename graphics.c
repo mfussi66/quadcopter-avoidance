@@ -43,7 +43,7 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
 		y = coord_y - (int)(data[i] * PLT_SCALE / 2) - 50;
 		
 		if(data[i] >  0.0)
-			fastline(bmp, x_prev, y_prev, x, y, makecol(0, 255, 0));
+			fastline(bmp, x_prev, y_prev, x, y, COL_GREEN);
 
 		x_prev = x;
 		y_prev = y;
@@ -68,7 +68,7 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	
 	textout_centre_ex(bmp, font, "X", 690, 335, col, -1);
 	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
-	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);	
+	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);
 
 }
 
@@ -82,36 +82,48 @@ void draw_exit_screen(BITMAP* bmp, int col)
 
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
 {
-	int col =  makecol(255, 0, 0);
-	
+	int red =  makecol(255, 0, 0);
+	int blk = makecol(0,0,0);
 	Trace temp;
 	int X[3] = {0.0};
 	int old_X[3] = {0.0};
 	
-	X[0] = (int)(ENV_OFFSET_X + ENV_SCALE * (pose[3]));
+	X[0] = (int)(ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3]));
 	X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (pose[4]));
 	
-	old_X[0] = (int)(ENV_OFFSET_X + ENV_SCALE * (old_pose[3]));
+	old_X[0] = (int)(ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3]));
 	old_X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (old_pose[4]));
-	
-	double angle = 120 / (5 - 1);
 	
 	for(int i = 0; i < 5; i++)
 	{
-		temp.x = ENV_OFFSET_X + ENV_SCALE * (old_pose[3]) + old[i].x;
-		temp.y = ENV_OFFSET_Y - (ENV_SCALE * (old_pose[4]) + old[i].y);
+		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3] + old[i].x);
+		temp.y = ENV_OFFSET_Y - ENV_SCALE * (old_pose[4] + old[i].y);
 		temp.z = old_pose[5] + old[i].z;
 		
-		fastline(bmp, old_X[0], old_X[1], (int)temp.x, (int)temp.y, makecol(0,0,0));
+		fastline(bmp, old_X[0], old_X[1], (int)temp.x, (int)temp.y, blk);
 
-		temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3]) + new[i].x;
-		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4]) - new[i].y;
+		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + new[i].x);
+		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
 		temp.z = pose[5] + new[i].z;
 		
-		printf("print %d, x: %f, y: %f xd: %f yd: %f \n", i, temp.x,temp.y, new[i].x,new[i].y);
-		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, col);
+		//printf("print %d, x: %f, y: %f xd: %f yd: %f \n", i, temp.x,temp.y, new[i].x,new[i].y);
+		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, red);
 	}
-	printf("---\n");
+	//printf("---\n");
+
+}
+
+void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new)
+{
+
+int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);
+int old_y = ENV_OFFSET_Y - (int) (ENV_SCALE * old[4]);
+
+int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
+int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
+
+	draw_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2);
+	draw_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2);
 
 }
 
@@ -151,7 +163,7 @@ void draw_pose(BITMAP* bmp, double* old, double* new)
     tr2_1_x = x + 12;
     tr2_1_y = y + 12;
     
-    triangle(bmp, tr1_1_x,tr1_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y,makecol(0,255,0));
-    triangle(bmp, tr2_1_x,tr2_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y,makecol(0,255,0));
+    triangle(bmp, tr1_1_x,tr1_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
+    triangle(bmp, tr2_1_x,tr2_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
     
 }
