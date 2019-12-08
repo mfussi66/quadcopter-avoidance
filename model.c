@@ -34,6 +34,7 @@ void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u)
  	gsl_vector_sub(e, x);
 
 	gsl_blas_dgemv(CblasNoTrans, 1, K, e, 0, u);
+
 }
 
 /* 
@@ -84,16 +85,17 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 	int col = makecol(0, 255, 0);
 	int i = 0;
 	int obj_found;
+	double yaw = pose[2];
 	Trace temp;
 	
-	for (int a = angle; a <= spread; a += angle)
+	for (int a = angle - 90; a <= spread - 90; a += angle)
 	{
 		obj_found = 0;
 		
-		for(int d = BEAM_DMIN; d <= BEAM_DMAX; d += BEAM_DSTEP)
+		for(int d = BEAM_DMIN; (d <= BEAM_DMAX) && (obj_found == 0); d += BEAM_DSTEP)
 		{	
-			temp.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + d * sin(deg2rad(a)));
-			temp.y = ENV_OFFSET_Y - OFFSET_LASER - ENV_SCALE * (pose[4] + d * cos(deg2rad(a)));
+			temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + d * cos(deg2rad(a) + yaw));
+			temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + d * sin(deg2rad(a) + yaw));
 			temp.z = pose[5] - 0 * sin(deg2rad(a));
 			
 			//printf("d: %d, a: %d x: %f, y: %f \n", d, a, temp.x,temp.y);
@@ -101,19 +103,18 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			
 			if (getpixel(bmp, (int)temp.x, (int)temp.y) ==  COL_GREEN)
 			{
-				//printf("Beam %d found col %d: x: %f y: %f \n", i + 1, col, temp.x, temp.y);
+				//printf("Beam %d found: x: %f y: %f \n", i, temp.x, temp.y);
 				obj_found = 1;
-				break;
 			}
 		}
 		//printf("beam %d, a: %d x: %f, y: %f \n", i, a, temp.x,temp.y);
 		if (i < n)
 		{
-			tr[i].x = (temp.x - ENV_OFFSET_X) / ENV_SCALE - pose[3];
-			tr[i].y = (temp.y - ENV_OFFSET_Y + OFFSET_LASER) / (- ENV_SCALE) - pose[4];
+			tr[i].x = (temp.x - ENV_OFFSET_X - OFFSET_LASER) / ENV_SCALE - pose[3];
+			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
 			tr[i].z = temp.z;
 			if (obj_found)
-				printf("Beam %d: a: %d xd: %f yd: %f \n", i + 1, a, tr[i].x, tr[i].y);
+				printf("Beam %d: a: %d xd: %f yd: %f \n", i, a, tr[i].x, tr[i].y);
 			i++;
 		}
 	}

@@ -203,7 +203,7 @@ struct task_par* tp;
 	gsl_matrix_free(A);
 	gsl_matrix_free(B);
 
-    printf("model task exited\n");
+    printf("model task closed\n");
     
 	pthread_exit(0);
 
@@ -239,8 +239,9 @@ void* lqr_task(void* arg)
 	
     read_matrix_file("K.bin", K);
 	
+	gsl_vector_set(setpoint, 2, M_PI/4);
 	gsl_vector_set(setpoint, 3, 10);
-	gsl_vector_set(setpoint, 4, 2);
+	gsl_vector_set(setpoint, 4, 10);
 	gsl_vector_set(setpoint, 5, 10);
     
 	do{
@@ -254,7 +255,6 @@ void* lqr_task(void* arg)
 		pthread_mutex_lock (&mux_forces);
 		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock (&mux_forces);
-		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
@@ -268,7 +268,7 @@ void* lqr_task(void* arg)
 	gsl_vector_free(setpoint);
 	gsl_matrix_free(K);
     
-    printf("lqr task exited\n");
+    printf("lqr task closed\n");
     
 	pthread_exit(0);
 	
@@ -327,7 +327,7 @@ double pose[6] = {0.0};
 		
 	}while(scan != KEY_ESC);
 
-    printf("Laser Scanner task exited\n");
+    printf("Laser Scanner task closed\n");
     
 	pthread_exit(0);
 	
@@ -494,36 +494,36 @@ double new_pose[SIZE_Y] = {0.0};
 void* key_task(void* arg)
 {
     
-    struct task_par* tp;
-	    
-    tp = (struct task_par *)arg;
-	
+	struct task_par* tp;
+
+	tp = (struct task_par *)arg;
+
 	set_period (tp);
-    
-    key_enabled = 1;
-	
+
+	key_enabled = 1;
+
 	printf("Keyboard task started\n");
 
-    do{
-        
-        scan = 0;
-        
-        if (keypressed())
-            scan = readkey() >> 8;
-        
-        if (deadline_miss(tp))		
-                printf ("DEADLINE MISS: key_task()\n");
+	do{
 
-        wait_for_period (tp);
+	scan = 0;
+
+	if (keypressed())
+		scan = readkey() >> 8;
+
+	if (deadline_miss(tp))		
+	printf ("DEADLINE MISS: key_task()\n");
+
+	wait_for_period (tp);
 
 	}while(scan != KEY_ESC);
-    
-    if(scan == KEY_ESC)
-    {
-        printf("ESCAPE key was pressed: Closing simulation\n");
-        key_enabled = 0;
-    }
-    
+
+	if(scan == KEY_ESC)
+	{
+		printf("ESCAPE key was pressed: Closing simulation\n");
+		key_enabled = 0;
+	}
+
 	pthread_exit(0);
-    
+
 }

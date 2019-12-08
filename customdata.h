@@ -16,10 +16,10 @@
 #define ENV_OFFSET_Y 575
 #define ENV_SCALE 10
 
-#define OFFSET_LASER 12
-#define BEAM_DMIN 1
-#define BEAM_DMAX 10
-#define BEAM_DSTEP 2
+#define OFFSET_LASER 0
+#define BEAM_DMIN 3
+#define BEAM_DMAX 12
+#define BEAM_DSTEP 1
 
 #define COL_GREEN 48
 

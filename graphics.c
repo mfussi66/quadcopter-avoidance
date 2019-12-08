@@ -106,7 +106,7 @@ void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
 		temp.z = pose[5] + new[i].z;
 		
-		//printf("print %d, x: %f, y: %f xd: %f yd: %f \n", i, temp.x,temp.y, new[i].x,new[i].y);
+		//printf("print %d, x: %d, y: %d xd: %f yd: %f \n", i, (int)temp.x,(int)temp.y, new[i].x,new[i].y);
 		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, red);
 	}
 	//printf("---\n");
@@ -118,13 +118,13 @@ void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new)
 
 int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);
 int old_y = ENV_OFFSET_Y - (int) (ENV_SCALE * old[4]);
+fixed old_yaw = itofix(-old[2] * 180 / M_PI);
 
 int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
 int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
-
-	draw_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2);
-	draw_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2);
-
+fixed yaw = itofix(-new[2] * 180 / M_PI);
+	rotate_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2, old_yaw);
+	rotate_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2, yaw);	
 }
 
 void draw_pose(BITMAP* bmp, double* old, double* new)
