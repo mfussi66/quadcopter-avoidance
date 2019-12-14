@@ -19,6 +19,18 @@ void compute_error(Vector* setpoint, Vector* state, Vector *result)
 }
 
 /* 
+ * Function: scalar absolut error computation
+ * ---------------------------
+ * Computes error between setpoint and measured state
+ * allocates a new vector so that gsl_vector_sub() does not
+ * overwrite the first argument
+ */
+double compute_error_scabs(Vector* v1, Vector* v2, int idx)
+{
+	return fabs(gsl_vector_get(v1, idx) - gsl_vector_get(v2, idx));
+}
+
+/* 
  * Function: control action computation
  * ---------------------------
  * computes the control action as e = K*u
@@ -79,6 +91,13 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 	
 }
 
+/* 
+ * Function: Get distances from laser scanner
+ * ---------------------------
+ * Computes distances from obstacles simulating a laser scanner,
+ * for each beam at a specific aperture looks for green pixels at a certain
+ * increasing distance step
+ */
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n)
 {
 	int angle = spread / (n);
@@ -114,13 +133,33 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
 			tr[i].z = temp.z;
 			if (obj_found)
-				printf("Beam %d: a: %d xd: %f yd: %f \n", i, a, tr[i].x, tr[i].y);
+				printf("Beam %d: xd: %f yd: %f \n", i, tr[i].x, tr[i].y);
 			i++;
 		}
 	}
-	//printf("<<<<<<\n");
+	printf("---\n");
 }
 
+void compute_force_vector(Trace* tr, int n, double *force)
+{
+	Trace temp;
+	
+	for(int i = 0; i < n; i++)
+	{
+		temp.x += BEAM_DMAX - tr[i].x; 
+		temp.y += BEAM_DMAX - tr[i].y;
+		temp.z += BEAM_DMAX - tr[i].z;
+	}
+	
+	force[0] = temp.x;
+	force[1] = temp.y;
+	force[2] = temp.z;
+}
+
+/* 
+ * Function: Utility functions for angle conversion
+ * ---------------------------
+ */
 double deg2rad(double n)
 {
 	return n * M_PI / 180;	

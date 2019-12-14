@@ -153,7 +153,6 @@ struct task_par* tp;
 
 	gsl_vector_view forces;
 	gsl_vector* state = gsl_vector_calloc(SIZE_X);
-
 	gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
 	gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
 
@@ -177,9 +176,7 @@ struct task_par* tp;
 		pthread_mutex_lock (&mux_forces);
 		
         forces = gsl_vector_view_array(arr_forces, SIZE_U);
-        
-		pthread_mutex_unlock (&mux_forces);
-		
+        		
         // Lock state and compute new state from transition function
         pthread_mutex_lock (&mux_state);
         
@@ -187,6 +184,8 @@ struct task_par* tp;
 		
 		quad_linear_model(&forces.vector, A, B, state);
 
+		pthread_mutex_unlock (&mux_forces);
+		
 		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
 
 		pthread_mutex_unlock (&mux_state);
@@ -217,16 +216,34 @@ struct task_par* tp;
  */
 void* lqr_task(void* arg)
 {
-	struct task_par* tp;
+
+struct task_par* tp;
+
+gsl_vector* state = gsl_vector_calloc(SIZE_X);
+gsl_vector* forces = gsl_vector_calloc(SIZE_U);
+gsl_vector* setpoint = gsl_vector_calloc(SIZE_X);
+gsl_vector* altitude_sp = gsl_vector_calloc(SIZE_X);
+gsl_vector* yaw_sp = gsl_vector_calloc(SIZE_X);
+gsl_matrix* K = gsl_matrix_calloc(SIZE_U, SIZE_X);
+gsl_vector_view state_view;
+
+
+double error;
 	
-	gsl_vector* state = gsl_vector_calloc(SIZE_X);
-	gsl_vector* forces = gsl_vector_calloc(SIZE_U);
-	gsl_vector* setpoint = gsl_vector_calloc(SIZE_X);
-	gsl_matrix* K = gsl_matrix_calloc(SIZE_U, SIZE_X);
-	gsl_vector_view state_view;
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
+
+	read_matrix_file("K.bin", K);
+	
+	gsl_vector_set(setpoint, 2, M_PI/4);
+	gsl_vector_set(setpoint, 3, 10);
+	gsl_vector_set(setpoint, 4, 10);
+	gsl_vector_set(setpoint, 5, 10);
+	gsl_vector_set(altitude_sp, 5, 10);
+	
+	gsl_vector_set(yaw_sp, 5, 10);
+	gsl_vector_set(yaw_sp, 2, M_PI/4);
 	
 	do{
 		if (deadline_miss (tp))
@@ -236,24 +253,20 @@ void* lqr_task(void* arg)
 	}while(key_enabled == 0 && gfx_enabled == 0);
     
     printf("LQR Controller task started\n");
-	
-    read_matrix_file("K.bin", K);
-	
-	gsl_vector_set(setpoint, 2, M_PI/4);
-	gsl_vector_set(setpoint, 3, 10);
-	gsl_vector_set(setpoint, 4, 10);
-	gsl_vector_set(setpoint, 5, 10);
-    
+	  
 	do{
 		
 		pthread_mutex_lock (&mux_state);
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
-
 		dlqr_control(setpoint, &state_view.vector, K, forces);
 		pthread_mutex_unlock (&mux_state);
 		
 		pthread_mutex_lock (&mux_forces);
 		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
+		
+// 		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
+// 			   arr_forces[0], arr_forces[1], arr_forces[2], arr_forces[3]);
+// 		
 		pthread_mutex_unlock (&mux_forces);
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
@@ -285,6 +298,9 @@ Trace old_traces[5];
 double initialpose[6] = {0.0};
 double old_pose[6] = {0.0};
 double pose[6] = {0.0};
+double rep_force[3] = {0.0};
+double rep_force_angle = 0.0;
+double rep_force_ampli = 0.0;
 	
 	tp = (struct task_par *)arg;
 	
@@ -316,7 +332,13 @@ double pose[6] = {0.0};
 		pthread_mutex_lock(&mux_gfx);
 		memcpy(old_traces, laser_traces, sizeof(double) * 3 * n_traces);
 		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, n_traces);
-	
+		compute_force_vector(laser_traces, n_traces, rep_force);
+		
+		rep_force_angle = atan2(rep_force[1], rep_force[0]);
+		rep_force_ampli = sqrt(rep_force[0] * rep_force[0] + rep_force[1] * rep_force[1]);
+		
+		printf("rep force (%f, %f)\n", rad2deg(rep_force_angle), rep_force_ampli);
+		
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
 		
@@ -334,7 +356,7 @@ double pose[6] = {0.0};
 }
 
 /*
- * Task
+ * Task: Main graphics thread
  * -----------------
  * Used for drawing model
  * 
@@ -355,16 +377,18 @@ BITMAP* quad_bg;
 	
 	set_period (tp);
 
-    gfx_enabled = 1;
-
 	buffer_gfx = create_bitmap(SCREEN_W, SCREEN_H);
 	
 	clear_to_color(buffer_gfx, 0);
 
 	build_gui(buffer_gfx, font, COL_GREEN);
 	
+	generate_obstacles(buffer_gfx, COL_GREEN);
+	
 	quad = load_bmp("bmp/quad.bmp", NULL);
 	quad_bg = load_bmp("bmp/black.bmp", NULL);
+	
+	gfx_enabled = 1;
 	
 	if(quad == NULL)
 		printf("Drone sprite not found!\n");
@@ -380,6 +404,8 @@ BITMAP* quad_bg;
 			draw_quad(buffer_gfx, quad, quad_bg, old_pose, curr_pose);
 		else
 			draw_pose(buffer_gfx, old_pose, curr_pose);
+		
+		generate_obstacles(buffer_gfx, COL_GREEN);
 		
         pthread_mutex_lock(&mux_gfx);
 

@@ -20,6 +20,8 @@ void build_gui(BITMAP* bmp, FONT* font, int col);
 
 void draw_exit_screen(BITMAP* bmp, int col);
 
+void generate_obstacles(BITMAP* bmp, int col);
+
 void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y);
 
 void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new);

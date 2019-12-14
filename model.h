@@ -24,9 +24,13 @@ void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
 
 void compute_error(Vector *setpoint, Vector *state, Vector *result);
 
+double compute_error_scabs(Vector* v1, Vector* v2, int idx);
+
 void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n);
+
+void compute_force_vector(Trace* tr, int n, double *force);
 
 double rad2deg(double n);
 

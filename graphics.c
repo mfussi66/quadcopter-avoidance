@@ -52,7 +52,9 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
 
 void build_gui(BITMAP* bmp, FONT* font, int col)
 {
+	// Environment window
 	rect(bmp, 5, 5, 560, 595, col);
+
 	
 	rect(bmp, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
 	rect(bmp, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
@@ -78,6 +80,13 @@ void draw_exit_screen(BITMAP* bmp, int col)
 	textout_centre_ex(bmp, font, "   Simulation stopped    ", 400, 300, col, -1);
 	textout_centre_ex(bmp, font, "  Thank you for playing  ", 400, 310, col, -1);
 	textout_centre_ex(bmp, font, "_________________________", 400, 315, col, -1);	
+}
+
+void generate_obstacles(BITMAP* bmp, int col)
+{
+	rectfill(bmp, 5, 250, 250, 400, col);
+	rectfill(bmp, 360, 100, 560, 200, col);
+	
 }
 
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)

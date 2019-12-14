@@ -17,7 +17,7 @@
 #define ENV_SCALE 10
 
 #define OFFSET_LASER 0
-#define BEAM_DMIN 3
+#define BEAM_DMIN 2
 #define BEAM_DMAX 12
 #define BEAM_DSTEP 1
 
