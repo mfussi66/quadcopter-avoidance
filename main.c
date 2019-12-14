@@ -10,6 +10,7 @@
 double arr_state[SIZE_X] = {0.0};
 double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
+double arr_repulsive_forces[SIZE_U] = {0.0};
 double arr_error[SIZE_X] = {0.0};
 
 float w_lift_off = 0.0;
@@ -152,6 +153,7 @@ struct task_par* tp;
 	set_period (tp);
 
 	gsl_vector_view forces;
+	gsl_vector_view repulsive_forces;
 	gsl_vector* state = gsl_vector_calloc(SIZE_X);
 	gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
 	gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
@@ -163,7 +165,7 @@ struct task_par* tp;
 		
 		wait_for_period (tp);
         
-	}while(key_enabled == 0 && gfx_enabled == 0);
+	}while(scan != KEY_ENTER);
     
     read_matrix_file("A.bin", A);
 	read_matrix_file("B.bin", B);
@@ -174,8 +176,10 @@ struct task_par* tp;
 		
 		// Lock forces to store in internal variable
 		pthread_mutex_lock (&mux_forces);
-		
+		repulsive_forces =  gsl_vector_view_array(arr_repulsive_forces, SIZE_U);
         forces = gsl_vector_view_array(arr_forces, SIZE_U);
+		
+		gsl_vector_add(&forces.vector, &repulsive_forces.vector);
         		
         // Lock state and compute new state from transition function
         pthread_mutex_lock (&mux_state);
@@ -237,8 +241,8 @@ double error;
 	read_matrix_file("K.bin", K);
 	
 	gsl_vector_set(setpoint, 2, M_PI/4);
-	gsl_vector_set(setpoint, 3, 10);
-	gsl_vector_set(setpoint, 4, 10);
+	gsl_vector_set(setpoint, 3, 30);
+	gsl_vector_set(setpoint, 4, 20);
 	gsl_vector_set(setpoint, 5, 10);
 	gsl_vector_set(altitude_sp, 5, 10);
 	
@@ -250,7 +254,7 @@ double error;
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-	}while(key_enabled == 0 && gfx_enabled == 0);
+	}while(scan != KEY_ENTER);
     
     printf("LQR Controller task started\n");
 	  
@@ -298,7 +302,8 @@ Trace old_traces[5];
 double initialpose[6] = {0.0};
 double old_pose[6] = {0.0};
 double pose[6] = {0.0};
-double rep_force[3] = {0.0};
+double rep_forces_xyz[3] = {0.0};
+double rep_forces[SIZE_U] = {0.0};
 double rep_force_angle = 0.0;
 double rep_force_ampli = 0.0;
 	
@@ -318,7 +323,7 @@ double rep_force_ampli = 0.0;
 		
 		wait_for_period (tp);
 
-	}while(key_enabled == 0 && gfx_enabled == 0);
+	}while(scan != KEY_ENTER);
     
     printf("Laser Scanner task started\n");
     
@@ -332,15 +337,29 @@ double rep_force_ampli = 0.0;
 		pthread_mutex_lock(&mux_gfx);
 		memcpy(old_traces, laser_traces, sizeof(double) * 3 * n_traces);
 		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, n_traces);
-		compute_force_vector(laser_traces, n_traces, rep_force);
-		
-		rep_force_angle = atan2(rep_force[1], rep_force[0]);
-		rep_force_ampli = sqrt(rep_force[0] * rep_force[0] + rep_force[1] * rep_force[1]);
-		
-		printf("rep force (%f, %f)\n", rad2deg(rep_force_angle), rep_force_ampli);
-		
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
+		
+		pthread_mutex_lock(&mux_forces);
+		compute_force_vector(laser_traces, n_traces, pose, rep_forces_xyz);
+		
+		rep_forces[0] = 2 * rep_forces_xyz[1]; //tau_roll
+		rep_forces[1] = 0.5 * rep_forces_xyz[0]; //tau_pitch
+		
+		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
+		pthread_mutex_unlock(&mux_forces);
+		
+		if ((rep_forces_xyz[0] < 0.001 && rep_forces_xyz[0] > -0.001) && 
+			(rep_forces_xyz[1] < 0.001 && rep_forces_xyz[1] > -0.001))
+			rep_force_angle = M_PI / 2;
+		else
+			rep_force_angle = atan2(rep_forces_xyz[1], rep_forces_xyz[0]);
+		
+		rep_force_ampli = sqrt(rep_forces_xyz[0] * rep_forces_xyz[0] + rep_forces_xyz[1] * rep_forces_xyz[1]);
+
+		printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
+		printf("rep force (%.2f, %.2f)\n", rad2deg(rep_force_angle), rep_force_ampli);
+		printf("---\n");
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lsr_task()\n");
@@ -462,7 +481,7 @@ double new_pose[SIZE_Y] = {0.0};
 			printf ("DEADLINE MISS: plt_task()\n");
 		
 		wait_for_period (tp);
-	}while(key_enabled == 0 && gfx_enabled == 0);
+	}while(scan != KEY_ENTER);
     
     printf("Plotting task started\n");
 

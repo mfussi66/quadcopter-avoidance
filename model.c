@@ -133,27 +133,32 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
 			tr[i].z = temp.z;
 			if (obj_found)
-				printf("Beam %d: xd: %f yd: %f \n", i, tr[i].x, tr[i].y);
+				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
 			i++;
 		}
 	}
-	printf("---\n");
+
 }
 
-void compute_force_vector(Trace* tr, int n, double *force)
+void compute_force_vector(Trace* tr, int n, double* pose, double *rep_force_body)
 {
-	Trace temp;
-	
+	Trace force_sum;
+	//double rep_force_ampli, rep_force_angle;
+	//double rep_force_body[3] = {0.0};
+	double yaw = pose[2];
+	double tr_ampli = 0.0;
 	for(int i = 0; i < n; i++)
 	{
-		temp.x += BEAM_DMAX - tr[i].x; 
-		temp.y += BEAM_DMAX - tr[i].y;
-		temp.z += BEAM_DMAX - tr[i].z;
+		tr_ampli = sqrt(tr[i].x * tr[i].x + tr[i].y * tr[i].y);
+		
+		force_sum.x += tr[i].x * (BEAM_DMAX / tr_ampli - 1); 
+		force_sum.y += tr[i].y * (BEAM_DMAX / tr_ampli - 1);
+		force_sum.z += BEAM_DMAX - tr[i].z;
 	}
-	
-	force[0] = temp.x;
-	force[1] = temp.y;
-	force[2] = temp.z;
+
+	rep_force_body[0] = force_sum.x * cos(yaw) - force_sum.y * sin(yaw);
+	rep_force_body[1] = force_sum.x * sin(yaw) + force_sum.y * cos(yaw);
+	rep_force_body[2] = force_sum.z;
 }
 
 /* 

@@ -30,7 +30,7 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n);
 
-void compute_force_vector(Trace* tr, int n, double *force);
+void compute_force_vector(Trace* tr, int n, double* pose, double* rep_force);
 
 double rad2deg(double n);
 
