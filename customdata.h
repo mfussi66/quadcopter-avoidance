@@ -16,6 +16,8 @@
 #define ENV_OFFSET_Y 575
 #define ENV_SCALE 10
 
+#define OBS_NUM 2
+
 #define OFFSET_LASER 0
 #define BEAM_DMIN 2
 #define BEAM_DMAX 12
@@ -41,6 +43,14 @@ typedef struct
 	double y;
 	double z;
 } Trace;
+
+typedef struct
+{
+	double x1;
+	double y1;
+	double x2;
+	double y2;
+} Obstacle;
 
 typedef struct servo_par {
 	int mid;				/* motor id */

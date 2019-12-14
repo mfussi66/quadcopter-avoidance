@@ -12,10 +12,12 @@ double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
 double arr_repulsive_forces[SIZE_U] = {0.0};
 double arr_error[SIZE_X] = {0.0};
+Obstacle arr_obstacles[OBS_NUM];
 
 float w_lift_off = 0.0;
 float yawref = 0.0;
 
+int collision = 0;
 int gfx_initialized = 0;
 int key_initialized = 0;
 int gfx_enabled = 0;
@@ -180,26 +182,30 @@ struct task_par* tp;
         forces = gsl_vector_view_array(arr_forces, SIZE_U);
 		
 		gsl_vector_add(&forces.vector, &repulsive_forces.vector);
-        		
+		
         // Lock state and compute new state from transition function
         pthread_mutex_lock (&mux_state);
         
 		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
 		
 		quad_linear_model(&forces.vector, A, B, state);
-
+		
 		pthread_mutex_unlock (&mux_forces);
 		
 		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
 
+		collision = chk_collisions(arr_state, arr_obstacles, OBS_NUM);
+		if (collision ==1) 
+			printf("Collision detected!!\n");
+		
 		pthread_mutex_unlock (&mux_state);
-
+		
 		if (deadline_miss (tp))		
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
 		wait_for_period (tp);
 
-	}while(scan != KEY_ESC);
+	}while(scan != KEY_ESC && collision == 0);
 	
 	// free memory allocated for GSL variables
 	gsl_vector_free(state);
@@ -242,7 +248,7 @@ double error;
 	
 	gsl_vector_set(setpoint, 2, M_PI/4);
 	gsl_vector_set(setpoint, 3, 30);
-	gsl_vector_set(setpoint, 4, 20);
+	gsl_vector_set(setpoint, 4, 30);
 	gsl_vector_set(setpoint, 5, 10);
 	gsl_vector_set(altitude_sp, 5, 10);
 	
@@ -341,10 +347,10 @@ double rep_force_ampli = 0.0;
 		pthread_mutex_unlock(&mux_gfx);
 		
 		pthread_mutex_lock(&mux_forces);
-		compute_force_vector(laser_traces, n_traces, pose, rep_forces_xyz);
+		compute_repulsive_force(laser_traces, n_traces, pose, rep_forces_xyz);
 		
-		rep_forces[0] = 2 * rep_forces_xyz[1]; //tau_roll
-		rep_forces[1] = 0.5 * rep_forces_xyz[0]; //tau_pitch
+		rep_forces[0] = 1 * rep_forces_xyz[1]; //tau_roll
+		rep_forces[1] = 0.05 * rep_forces_xyz[0]; //tau_pitch
 		
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_forces);
@@ -357,16 +363,16 @@ double rep_force_ampli = 0.0;
 		
 		rep_force_ampli = sqrt(rep_forces_xyz[0] * rep_forces_xyz[0] + rep_forces_xyz[1] * rep_forces_xyz[1]);
 
-		printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
-		printf("rep force (%.2f, %.2f)\n", rad2deg(rep_force_angle), rep_force_ampli);
-		printf("---\n");
+// 		printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
+// 		printf("rep force (%.2f, %.2f)\n", rad2deg(rep_force_angle), rep_force_ampli);
+// 		printf("---\n");
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
 		
-	}while(scan != KEY_ESC);
+	}while(scan != KEY_ESC && collision == 0);
 
     printf("Laser Scanner task closed\n");
     
@@ -386,11 +392,13 @@ void* gfx_task(void* arg)
 struct task_par* tp;
 
 int gui_color =  makecol(0, 255, 0);
-double old_pose[6] = {0.0};
-double curr_pose[6] = {0.0};
+int ret_obs = 0;
+double old_pose[SIZE_Y] = {0.0};
+double curr_pose[SIZE_Y] = {0.0};
 
 BITMAP* quad;
 BITMAP* quad_bg;
+BITMAP* expl;
 
 	tp = (struct task_par *)arg;
 	
@@ -402,10 +410,14 @@ BITMAP* quad_bg;
 
 	build_gui(buffer_gfx, font, COL_GREEN);
 	
-	generate_obstacles(buffer_gfx, COL_GREEN);
+	ret_obs = gen_obstacles(arr_obstacles, OBS_NUM);
 	
+	if (ret_obs == -1)
+		printf("Impossible to load obstacles!\n");
+		
 	quad = load_bmp("bmp/quad.bmp", NULL);
 	quad_bg = load_bmp("bmp/black.bmp", NULL);
+	expl = load_bmp("bmp/expl.bmp", NULL);
 	
 	gfx_enabled = 1;
 	
@@ -419,12 +431,14 @@ BITMAP* quad_bg;
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
 		pthread_mutex_unlock(&mux_state); 
 		
-		if (quad != NULL)
+		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
+		
+		if (collision)
+			draw_quad(buffer_gfx, expl, quad_bg, old_pose, curr_pose);
+		else if (quad != NULL)
 			draw_quad(buffer_gfx, quad, quad_bg, old_pose, curr_pose);
 		else
 			draw_pose(buffer_gfx, old_pose, curr_pose);
-		
-		generate_obstacles(buffer_gfx, COL_GREEN);
 		
         pthread_mutex_lock(&mux_gfx);
 

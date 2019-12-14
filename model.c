@@ -132,19 +132,17 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			tr[i].x = (temp.x - ENV_OFFSET_X - OFFSET_LASER) / ENV_SCALE - pose[3];
 			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
 			tr[i].z = temp.z;
-			if (obj_found)
-				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
+// 			if (obj_found)
+// 				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
 			i++;
 		}
 	}
 
 }
 
-void compute_force_vector(Trace* tr, int n, double* pose, double *rep_force_body)
+void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_body)
 {
 	Trace force_sum;
-	//double rep_force_ampli, rep_force_angle;
-	//double rep_force_body[3] = {0.0};
 	double yaw = pose[2];
 	double tr_ampli = 0.0;
 	for(int i = 0; i < n; i++)
@@ -160,6 +158,26 @@ void compute_force_vector(Trace* tr, int n, double* pose, double *rep_force_body
 	rep_force_body[1] = force_sum.x * sin(yaw) + force_sum.y * cos(yaw);
 	rep_force_body[2] = force_sum.z;
 }
+
+int chk_collisions(double* pose, Obstacle* obs, int n_obs)
+{
+	double x = pose[3];
+	double y = pose[4];
+	
+	int result = 0;
+	
+	for (int i = 0; i < n_obs; i++)
+	{
+		//printf("x: %f y: %f \n", x, y);
+		//printf("x1: %f y1: %f x2: %f y2: %f\n", obs[i].x1, obs[i].y1, obs[i].x2, obs[i].y2);
+		if(x >= obs[i].x1 && x <= obs[i].x2 &&
+			y <= obs[i].y1 && y >= obs[i].y2)
+			result = 1;
+	}
+	//printf("---\n");
+	return result;
+}
+
 
 /* 
  * Function: Utility functions for angle conversion

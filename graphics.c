@@ -55,19 +55,18 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	// Environment window
 	rect(bmp, 5, 5, 560, 595, col);
 
-	
+	// Plots coordinates
 	rect(bmp, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
 	rect(bmp, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
 	rect(bmp, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
-	
 	rect(bmp, 580, 285, 680, 385, col);
 	rect(bmp, 580, 390, 680, 490, col);
 	rect(bmp, 580, 495, 680, 595, col);
 	
+	// Plots labels
 	textout_centre_ex(bmp, font, "R", 575, 335, col, -1);
 	textout_centre_ex(bmp, font, "P", 575, 440, col, -1);
 	textout_centre_ex(bmp, font, "Y", 575, 545, col, -1);
-	
 	textout_centre_ex(bmp, font, "X", 690, 335, col, -1);
 	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
 	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);
@@ -82,11 +81,40 @@ void draw_exit_screen(BITMAP* bmp, int col)
 	textout_centre_ex(bmp, font, "_________________________", 400, 315, col, -1);	
 }
 
-void generate_obstacles(BITMAP* bmp, int col)
+int gen_obstacles(Obstacle* arr_obstacles, int n_obs)
 {
-	rectfill(bmp, 5, 250, 250, 400, col);
-	rectfill(bmp, 360, 100, 560, 200, col);
+	size_t n = (uint)n_obs;
+
+	if (n == 0)
+		return -1;
+
+	arr_obstacles[0].x1 = (5 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[0].y1 = (-250 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[0].x2 = (250 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[0].y2 = (-400 + ENV_OFFSET_Y) / ENV_SCALE;
 	
+	arr_obstacles[1].x1 = (360 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[1].y1 = (-100 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[1].x2 = (560 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[1].y2 = (-200 + ENV_OFFSET_Y) / ENV_SCALE;
+	
+	return 0;
+	
+}
+
+void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col)
+{
+	int X_env[4] = {0}; 
+	
+	for(int i = 0; i < n_obs; i++)
+	{		
+		X_env[0] = (int)(ENV_OFFSET_X + ENV_SCALE * (obs[i].x1));
+		X_env[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (obs[i].y1));
+		X_env[2] = (int)(ENV_OFFSET_X + ENV_SCALE * (obs[i].x2));
+		X_env[3] = (int)(ENV_OFFSET_Y - ENV_SCALE * (obs[i].y2));
+		
+		rectfill(bmp, X_env[0], X_env[1], X_env[2], X_env[3], col);
+	}
 }
 
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
