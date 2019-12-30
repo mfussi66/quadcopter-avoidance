@@ -11,8 +11,11 @@ void start_allegro (void)
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_XWINDOWS, 800, 600, 0, 0);
+	set_gfx_mode (GFX_AUTODETECT_WINDOWED, 800, 600, 0, 0);
     install_keyboard();
+	install_mouse();
+	
+	enable_hardware_cursor();
     
     clear_to_color (screen, 0);
     
@@ -28,26 +31,6 @@ void close_allegro(void)
 	allegro_exit();
     
     printf("Graphics: Allegro is closed\n");
-}
-
-void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
-{
-	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
-	int y = coord_y - (int)(data[0] * PLT_SCALE / 2) - 50;
-	int x_prev = x;
-	int y_prev = y;
-	
-	for(int i = 0; i < PLT_DATA_SIZE; i++)
-	{
-		x = x + PLT_STEP;
-		y = coord_y - (int)(data[i] * PLT_SCALE / 2) - 50;
-		
-		if(data[i] >  0.0)
-			fastline(bmp, x_prev, y_prev, x, y, COL_GREEN);
-
-		x_prev = x;
-		y_prev = y;
-	}
 }
 
 void build_gui(BITMAP* bmp, FONT* font, int col)
@@ -115,6 +98,19 @@ void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col)
 		
 		rectfill(bmp, X_env[0], X_env[1], X_env[2], X_env[3], col);
 	}
+	
+}
+
+
+int waypoints_filled(WPoint *array, int size)
+{
+	for(int i = 0; i < size; i++)
+	{
+		if(array[i].x == -9999 || array[i].y == -9999)
+			return 0;
+	}
+	
+	return 1;
 }
 
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
@@ -203,4 +199,59 @@ void draw_pose(BITMAP* bmp, double* old, double* new)
     triangle(bmp, tr1_1_x,tr1_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
     triangle(bmp, tr2_1_x,tr2_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
     
+}
+
+void draw_waypoints(BITMAP* bmp, WPoint* wpoints, int size)
+{
+
+int x;
+int y;
+
+int x_old;
+int y_old;
+
+	if (size == 0) return;
+
+	x = ENV_OFFSET_X + ENV_SCALE * wpoints[0].x;
+	y = ENV_OFFSET_Y - ENV_SCALE * wpoints[0].y;
+	
+	circlefill(bmp, x, y, 5, makecol(0, 255, 255));
+	
+	x_old = x;
+	y_old = y;
+	
+	for(int i = 1; i < size; i++)
+	{
+		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
+		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;
+		
+		circlefill(bmp, x, y, 5, makecol(255, 0, 0));
+	}
+	
+}
+
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
+{
+	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
+	int y = coord_y - (int)(data[0] * PLT_SCALE_Y) - PLT_FRAME_SIZE / 2;
+	int x_prev = x;
+	int y_prev = y;
+	
+	for(int i = 0; i < PLT_DATA_SIZE; i++)
+	{
+		x = x + PLT_STEP;
+
+		y = coord_y - (int)(data[i] * PLT_SCALE_Y) - PLT_FRAME_SIZE / 2;
+		
+		if (y < (coord_y - PLT_FRAME_SIZE))
+			y = (coord_y - PLT_FRAME_SIZE);
+		
+		if (y > coord_y)
+			y = coord_y;
+		
+		fastline(bmp, x_prev, y_prev, x, y, COL_GREEN);
+
+		x_prev = x;
+		y_prev = y;
+	}
 }

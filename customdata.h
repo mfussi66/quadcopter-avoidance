@@ -19,15 +19,17 @@
 #define OBS_NUM 2
 
 #define OFFSET_LASER 0
-#define BEAM_DMIN 2
-#define BEAM_DMAX 12
+#define BEAM_DMIN 1
+#define BEAM_DMAX 10
 #define BEAM_DSTEP 1
 
 #define COL_GREEN 48
 
+#define PLT_FRAME_SIZE 100
 #define PLT_DATA_SIZE 25
+#define PLT_SCALE_X PLT_DATA_SIZE
 #define PLT_STEP 4
-#define PLT_SCALE 5
+#define PLT_SCALE_Y 1
 #define PLT_XPOS_XCOORD 795
 #define PLT_XPOS_YCOORD 385
 #define PLT_YPOS_XCOORD 795
@@ -51,6 +53,12 @@ typedef struct
 	double x2;
 	double y2;
 } Obstacle;
+
+typedef struct
+{
+	double x;
+	double y;
+} WPoint;
 
 typedef struct servo_par {
 	int mid;				/* motor id */

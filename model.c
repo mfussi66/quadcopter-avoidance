@@ -143,20 +143,35 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_body)
 {
 	Trace force_sum;
+	
+	force_sum.x = 0.0;
+	force_sum.y = 0.0;
+	force_sum.z = 0.0;
+	
+	double ampli_sum = 0.0;
+	double angle_sum = 0.0;
 	double yaw = pose[2];
 	double tr_ampli = 0.0;
+	double tr_angle = 0.0;
+	
 	for(int i = 0; i < n; i++)
 	{
-		tr_ampli = sqrt(tr[i].x * tr[i].x + tr[i].y * tr[i].y);
-		
-		force_sum.x += tr[i].x * (BEAM_DMAX / tr_ampli - 1); 
-		force_sum.y += tr[i].y * (BEAM_DMAX / tr_ampli - 1);
-		force_sum.z += BEAM_DMAX - tr[i].z;
+		printf("%d: (x:%.2f, y:%.2f)\n",i, tr[i].x, tr[i].y);
+		tr_angle = atan2(tr[i].y, tr[i].x);
+		printf("   tr_angle %f\n", rad2deg(tr_angle));
+		force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
+		force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
+		force_sum.z += 0.0;
 	}
+	
+	tr_ampli = sqrt(force_sum.x * force_sum.x + force_sum.y * force_sum.y);
+	tr_angle = atan2(force_sum.y, force_sum.x);
 
 	rep_force_body[0] = force_sum.x * cos(yaw) - force_sum.y * sin(yaw);
-	rep_force_body[1] = force_sum.x * sin(yaw) + force_sum.y * cos(yaw);
+	rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
 	rep_force_body[2] = force_sum.z;
+	
+	printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
 }
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs)
@@ -164,17 +179,28 @@ int chk_collisions(double* pose, Obstacle* obs, int n_obs)
 	double x = pose[3];
 	double y = pose[4];
 	
-	int result = 0;
+	Obstacle env;
 	
+	env.x1 = 0.0;
+	env.y1 = 0.0;
+	env.x2 = 520 / ENV_SCALE;
+	env.y2 = 590 / ENV_SCALE;
+	
+	int result = 0;
+
+	//check collision with env boundaries
+	if(x <= env.x1 || x >= env.x2 ||
+		y <= env.y1 || y >= env.y2)
+		result = 1;
+
+	// check collision with obstacles
 	for (int i = 0; i < n_obs; i++)
 	{
-		//printf("x: %f y: %f \n", x, y);
-		//printf("x1: %f y1: %f x2: %f y2: %f\n", obs[i].x1, obs[i].y1, obs[i].x2, obs[i].y2);
 		if(x >= obs[i].x1 && x <= obs[i].x2 &&
 			y <= obs[i].y1 && y >= obs[i].y2)
 			result = 1;
 	}
-	//printf("---\n");
+	
 	return result;
 }
 
