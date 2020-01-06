@@ -19,15 +19,45 @@ void compute_error(Vector* setpoint, Vector* state, Vector *result)
 }
 
 /* 
- * Function: scalar absolut error computation
+ * Function: compute euclidean distance
  * ---------------------------
- * Computes error between setpoint and measured state
- * allocates a new vector so that gsl_vector_sub() does not
- * overwrite the first argument
+ * 
  */
-double compute_error_scabs(Vector* v1, Vector* v2, int idx)
+double compute_pos_dist(Vector* v1, Vector* v2)
 {
-	return fabs(gsl_vector_get(v1, idx) - gsl_vector_get(v2, idx));
+	double x = gsl_vector_get(v1, 3) - gsl_vector_get(v2, 3);
+	double y = gsl_vector_get(v1, 4) - gsl_vector_get(v2, 4);	
+	double z = gsl_vector_get(v1, 5) - gsl_vector_get(v2, 5);
+	
+	return sqrt(x * x + y * y + z * z);
+	
+}
+
+/* 
+ * Function: setpoint getter and computation
+ * ---------------------------
+ * 
+ */
+void compute_setpoint(Vector* sp, WPoint* wp, int wp_size, int* wp_flags)
+{
+	
+WPoint xy_setpoint;
+	
+	for(int i = 1; i < wp_size; i++)
+	{
+		if(wp_flags[i] == 0)
+		{
+			xy_setpoint.x = wp[i].x;
+			xy_setpoint.y = wp[i].y;
+			break;
+		}	
+	}
+	
+	gsl_vector_set(sp, 3, xy_setpoint.x);
+	gsl_vector_set(sp, 4, xy_setpoint.y);
+	
+	//TODO compute reference yaw
+	
 }
 
 /* 
@@ -156,9 +186,9 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	
 	for(int i = 0; i < n; i++)
 	{
-		printf("%d: (x:%.2f, y:%.2f)\n",i, tr[i].x, tr[i].y);
+		//printf("%d: (x:%.2f, y:%.2f)\n",i, tr[i].x, tr[i].y);
 		tr_angle = atan2(tr[i].y, tr[i].x);
-		printf("   tr_angle %f\n", rad2deg(tr_angle));
+		//printf("   tr_angle %f\n", rad2deg(tr_angle));
 		force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
 		force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
 		force_sum.z += 0.0;
@@ -171,7 +201,7 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
 	rep_force_body[2] = force_sum.z;
 	
-	printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
+	//printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
 }
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs)

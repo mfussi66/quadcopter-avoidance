@@ -201,7 +201,7 @@ void draw_pose(BITMAP* bmp, double* old, double* new)
     
 }
 
-void draw_waypoints(BITMAP* bmp, WPoint* wpoints, int size)
+void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)
 {
 
 int x;
@@ -210,8 +210,21 @@ int y;
 int x_old;
 int y_old;
 
-	if (size == 0) return;
+int blk = makecol(0, 0, 0);
+int red = makecol(255, 0, 0);
 
+	if (size == 0) return;
+	
+	// Draw black on old waypoints
+	for(int i = 0; i < 5; i++)
+	{
+		x = ENV_OFFSET_X + ENV_SCALE * old_wpoints[i].x;
+		y = ENV_OFFSET_Y - ENV_SCALE * old_wpoints[i].y;
+		
+		circlefill(bmp, x, y, 5, blk);
+	}
+
+	// Draw new waypoints
 	x = ENV_OFFSET_X + ENV_SCALE * wpoints[0].x;
 	y = ENV_OFFSET_Y - ENV_SCALE * wpoints[0].y;
 	
@@ -225,7 +238,7 @@ int y_old;
 		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
 		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;
 		
-		circlefill(bmp, x, y, 5, makecol(255, 0, 0));
+		circlefill(bmp, x, y, 5, red);
 	}
 	
 }

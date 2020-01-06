@@ -34,6 +34,6 @@ void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 
 int waypoints_filled(WPoint *array, int size);
 
-void draw_waypoints(BITMAP* bmp, WPoint* wpoints, int size);
+void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size);
 
 #endif

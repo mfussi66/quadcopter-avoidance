@@ -17,7 +17,7 @@ WPoint waypoints[5] = {{-9999}, {-9999}};
 
 Obstacle arr_obstacles[OBS_NUM];
 
-float w_lift_off = 0.0;
+double altitude_sp = 10.0;
 float yawref = 0.0;
 
 int collision = 0;
@@ -25,7 +25,11 @@ int gfx_initialized = 0;
 int key_initialized = 0;
 int gfx_enabled = 0;
 int key_enabled = 0;
-int waypoints_size = 0;
+int waypoints_num = 0;
+
+int start_sim = 0;
+int end_sim = 0;
+
 int Lmouse_clicked = 0;
 int Rmouse_clicked = 0;
 WPoint Rmouse;
@@ -104,9 +108,9 @@ int ret = 0;
 	//Create Waypoint selection Thread
     
 	tp_pnt.arg = 7;
-	tp_pnt.period = 500;
-	tp_pnt.deadline = 500 * 1;
-	tp_pnt.priority = 6;
+	tp_pnt.period = 100;
+	tp_pnt.deadline = 100 * 1;
+	tp_pnt.priority = 2;
 	tp_pnt.dmiss = 0;
 
 	ret = thread_create (&tp_pnt, &sched_pnt, attr_pnt, &tid_pnt, point_task);
@@ -153,6 +157,7 @@ int ret = 0;
     
 	pthread_join (tid_pnt, NULL);
     pthread_join (tid_plt, NULL);
+	pthread_join (tid_lsr, NULL);
     pthread_join (tid_lqr, NULL);
     pthread_join (tid_mod, NULL);
     pthread_join (tid_key, NULL);
@@ -188,12 +193,6 @@ struct task_par* tp;
 	gsl_vector* state = gsl_vector_calloc(SIZE_X);
 	gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
 	gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
-
-	// Set initial state
-	gsl_vector_set(state, 3, 1);
-	gsl_vector_set(state, 4, 1);
-	gsl_vector_set(state, 5, 0);
-	memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
 	
 	do{
 
@@ -202,13 +201,21 @@ struct task_par* tp;
 		
 		wait_for_period (tp);
         
-	}while(scan != KEY_ENTER);
+	}while(!start_sim  && !end_sim);
+	
+	// Set initial state from waypoints array
+	gsl_vector_set(state, 3, waypoints[0].x);
+	gsl_vector_set(state, 4, waypoints[0].y);
+	gsl_vector_set(state, 5, 0);
+	memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
     
     read_matrix_file("A.bin", A);
 	read_matrix_file("B.bin", B);
     
     printf("Dynamic model task started\n");
 
+	printf("init_s: (%f, %f)\n",gsl_vector_get(state, 3), gsl_vector_get(state, 4));
+	
     do{
 		
 		// Lock forces to store in internal variable
@@ -248,7 +255,7 @@ struct task_par* tp;
 		
 		wait_for_period (tp);
 
-	}while(scan != KEY_ESC && collision == 0);
+	}while(!end_sim && collision == 0);
 	
 	// free memory allocated for GSL variables
 	gsl_vector_free(forces);
@@ -276,11 +283,15 @@ struct task_par* tp;
 gsl_vector* state = gsl_vector_calloc(SIZE_X);
 gsl_vector* forces = gsl_vector_calloc(SIZE_U);
 gsl_vector* setpoint = gsl_vector_calloc(SIZE_X);
-gsl_vector* altitude_sp = gsl_vector_calloc(SIZE_X);
+//gsl_vector* altitude_sp = gsl_vector_calloc(SIZE_X);
 gsl_vector* yaw_sp = gsl_vector_calloc(SIZE_X);
 gsl_matrix* K = gsl_matrix_calloc(SIZE_U, SIZE_X);
 gsl_vector_view state_view;
 
+int waypoint_flags[4] = {0};
+int waypoint_idx = 1;
+int sp_selected = 0;
+double dist = 0.0;
 
 double error;
 	
@@ -290,27 +301,43 @@ double error;
 
 	read_matrix_file("K.bin", K);
 	
-	gsl_vector_set(setpoint, 2, M_PI/4);
-	gsl_vector_set(setpoint, 3, 30);
-	gsl_vector_set(setpoint, 4, 30);
-	gsl_vector_set(setpoint, 5, 10);
-	gsl_vector_set(altitude_sp, 5, 10);
-	
+// 	gsl_vector_set(setpoint, 2, M_PI/4);
+// 	gsl_vector_set(setpoint, 3, 30);
+// 	gsl_vector_set(setpoint, 4, 30);
+// 	gsl_vector_set(setpoint, 5, 10);
+// 	gsl_vector_set(altitude_sp, 5, 10);
+/*	
 	gsl_vector_set(yaw_sp, 5, 10);
-	gsl_vector_set(yaw_sp, 2, M_PI/2);
+	gsl_vector_set(yaw_sp, 2, M_PI/2);*/
 	
 	do{
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-	}while(scan != KEY_ENTER);
+	}while(!start_sim && !end_sim);
     
     printf("LQR Controller task started\n");
-	  
+	
+	compute_setpoint(setpoint, waypoints, waypoints_num, waypoint_flags);
+	
 	do{
 		
 		pthread_mutex_lock (&mux_state);
+		state_view = gsl_vector_view_array(arr_state, SIZE_X);
+
+		dist = compute_pos_dist(setpoint, &state_view.vector);
+
+		if(dist <= 0.4 && waypoint_idx < (waypoints_num - 1))
+		{
+			printf("Waypoint %d reached\n", waypoint_idx);
+			gsl_vector_set(setpoint, 5, altitude_sp);
+			waypoint_flags[waypoint_idx] = 1;
+			waypoint_idx++;
+			compute_setpoint(setpoint, waypoints, waypoints_num, waypoint_flags);
+			//printf("sp: (%f, %f)\n", gsl_vector_get(setpoint, 3), gsl_vector_get(setpoint, 4));
+		}
+		
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
 		dlqr_control(setpoint, &state_view.vector, K, forces);
 		pthread_mutex_unlock (&mux_state);
@@ -327,7 +354,7 @@ double error;
 		
 		wait_for_period (tp);
 		
-	}while(scan != KEY_ESC  && collision == 0);
+	}while(!end_sim  && collision == 0);
 
 	// free memory allocated for GSL variables
 	gsl_vector_free(state);
@@ -373,7 +400,7 @@ double rep_force_ampli = 0.0;
 		
 		wait_for_period (tp);
 
-	}while(scan != KEY_ENTER);
+	}while(!start_sim && !end_sim);
     
     printf("Laser Scanner task started\n");
     
@@ -398,8 +425,8 @@ double rep_force_ampli = 0.0;
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_forces);
 
-  		printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
- 		printf("---\n");
+  		//printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
+ 		//printf("---\n");
  		
 		pthread_mutex_lock(&mux_gfx);
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
@@ -410,7 +437,7 @@ double rep_force_ampli = 0.0;
 		
 		wait_for_period (tp);
 		
-	}while(scan != KEY_ESC && collision == 0);
+	}while(!end_sim && collision == 0);
 
     printf("Laser Scanner task closed\n");
     
@@ -433,6 +460,8 @@ int gui_color =  makecol(0, 255, 0);
 int ret_obs = 0;
 double old_pose[SIZE_Y] = {0.0};
 double curr_pose[SIZE_Y] = {0.0};
+WPoint curr_waypoints[5];
+WPoint old_waypoints[5];
 
 BITMAP* quad;
 BITMAP* quad_bg;
@@ -466,11 +495,14 @@ BITMAP* expl;
 	
 	do{
 		scare_mouse();
-		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);	
 		
-		draw_waypoints(buffer_gfx, waypoints, waypoints_size);
-
+		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
+		
+		memcpy(old_waypoints, curr_waypoints, sizeof(WPoint) * 5);
+		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * 5);
+		
 		pthread_mutex_lock(&mux_gfx);
+		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
 
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
 		
@@ -481,7 +513,7 @@ BITMAP* expl;
 			printf ("DEADLINE MISS: gfx_task()\n");
 
 		wait_for_period (tp);
-	}while(scan != KEY_ENTER);
+	}while(!start_sim && !end_sim);
 	
 	show_mouse(NULL);
 	
@@ -492,7 +524,10 @@ BITMAP* expl;
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
 		pthread_mutex_unlock(&mux_state); 
 	
+		build_gui(buffer_gfx, font, COL_GREEN);
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
+		
+		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
 		
 		if (collision)
 			draw_quad(buffer_gfx, expl, quad_bg, old_pose, curr_pose);
@@ -512,7 +547,9 @@ BITMAP* expl;
 		
 		wait_for_period (tp);
         
-	}while(key_enabled == 1);
+	}while(!end_sim);
+	
+	printf("Closing graphics task\n");
 
 	clear_to_color(buffer_gfx, 0);
 	
@@ -556,7 +593,7 @@ double new_pose[SIZE_Y] = {0.0};
 			printf ("DEADLINE MISS: plt_task()\n");
 		
 		wait_for_period (tp);
-	}while(scan != KEY_ENTER);
+	}while(!start_sim && !end_sim);
     
     printf("Plotting task started\n");
 
@@ -600,7 +637,7 @@ double new_pose[SIZE_Y] = {0.0};
 
 		wait_for_period (tp);
 
-	}while(gfx_enabled && key_enabled);
+	}while(!end_sim);
 	
 	pthread_exit(0);	
 }
@@ -616,8 +653,6 @@ void* point_task(void* arg)
 {
 struct task_par* tp;
 
-int wp_counter = 0;
-
 int wp_col = makecol(255, 0, 0);
 int start_col = makecol(0, 255, 255);
 int obs_col = makecol(0, 255, 0);
@@ -632,13 +667,16 @@ int returned_col = 0;
 	printf("Click on starting point\n");
 	
 	do{
-		if(Lmouse_clicked && getpixel(buffer_gfx, Lmouse.x, Lmouse.y) != obs_col)
+		pthread_mutex_lock(&mux_gfx);
+		if(Lmouse_clicked && 
+			getpixel(buffer_gfx, Lmouse.x, Lmouse.y) != obs_col &&
+			waypoints_num <= 4)
 		{
 			
-			waypoints[waypoints_size].x = (Lmouse.x - ENV_OFFSET_X) / ENV_SCALE;
-			waypoints[waypoints_size].y = (ENV_OFFSET_Y - Lmouse.y) / ENV_SCALE;
-			waypoints_size++;
-			printf("Click on %d waypoint\n", waypoints_size);
+			waypoints[waypoints_num].x = (Lmouse.x - ENV_OFFSET_X) / ENV_SCALE;
+			waypoints[waypoints_num].y = (ENV_OFFSET_Y - Lmouse.y) / ENV_SCALE;
+			waypoints_num++;
+			printf("Click on waypoint %d\n", waypoints_num);
 		}
 		
 		if(Rmouse_clicked)
@@ -646,27 +684,32 @@ int returned_col = 0;
 			returned_col = getpixel(buffer_gfx, Rmouse.x, Rmouse.y);
 			if (returned_col == wp_col || returned_col == start_col)
 			{
-				waypoints[waypoints_size].x = -9999;
-				waypoints[waypoints_size].y = -9999;
-				if (waypoints_size <= 0) 
-					waypoints_size = 0;
+				waypoints[waypoints_num].x = -9999;
+				waypoints[waypoints_num].y = -9999;
+				if (waypoints_num <= 0) 
+					waypoints_num = 0;
 				else
-					waypoints_size--;
+					waypoints_num--;
 			}
+		}
+		pthread_mutex_unlock(&mux_gfx);
+		
+		if (waypoints_num > 4)
+		{
+			printf("Maximum number of waypoints reached (4)\n Press ENTER to start the simulation\n");
 			
 		}
-		
 		Lmouse_clicked = 0;
 		Rmouse_clicked = 0;
 
-		if (deadline_miss(tp))		
+		if (deadline_miss(tp))
 			printf ("DEADLINE MISS: point_task()\n");
 
 		wait_for_period (tp);
 
-	}while((waypoints_size <= 4) || (scan != KEY_ENTER));
+	}while(!start_sim  && !end_sim);
 	
-	printf("Waypoints selection completed\n");
+	printf("Waypoints selection completed: found %d.\n", waypoints_num - 1);
 	
 	usleep(1e6);
 
@@ -701,6 +744,12 @@ void* key_task(void* arg)
 		if (keypressed())
 			scan = readkey() >> 8;
 
+		if(key[KEY_ESC])
+			end_sim = 1;
+
+		if(key[KEY_ENTER])
+			start_sim = 1;
+		
 		// Check left mouse click
 		if(mouse_b & 1)
 		{
@@ -722,9 +771,9 @@ void* key_task(void* arg)
 
 		wait_for_period (tp);
 
-	}while(scan != KEY_ESC);
+	}while(!end_sim);
 
-	if(scan == KEY_ESC)
+	if(end_sim)
 	{
 		printf("ESCAPE key was pressed: Closing simulation\n");
 		key_enabled = 0;

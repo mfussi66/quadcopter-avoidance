@@ -20,11 +20,13 @@ typedef gsl_matrix Matrix;
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
+void compute_setpoint(Vector* sp, WPoint* wp, int wp_size, int* wp_flags);
+
 void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
 
 void compute_error(Vector *setpoint, Vector *state, Vector *result);
 
-double compute_error_scabs(Vector* v1, Vector* v2, int idx);
+double compute_pos_dist(Vector* v1, Vector* v2);
 
 void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 
