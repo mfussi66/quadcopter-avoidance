@@ -27,6 +27,11 @@ int gfx_enabled = 0;
 int key_enabled = 0;
 int waypoints_num = 0;
 
+int tp_changed = 0;
+int selected_thread = 99;
+int sel_thread_old_tp = 0;
+int thread_periods[7] = {0};
+
 int start_sim = 0;
 int end_sim = 0;
 
@@ -95,6 +100,8 @@ int ret = 0;
 
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
 
+	thread_periods[0] = TP_GFX;
+	
    	//Create Keyboard Thread
     
 	tp_key.arg = 2;
@@ -105,6 +112,8 @@ int ret = 0;
 
 	ret = thread_create (&tp_key, &sched_key, attr_key, &tid_key, key_task);
 
+	thread_periods[1] = TP_KEY;
+	
 	//Create Waypoint selection Thread
     
 	tp_pnt.arg = 7;
@@ -115,6 +124,8 @@ int ret = 0;
 
 	ret = thread_create (&tp_pnt, &sched_pnt, attr_pnt, &tid_pnt, point_task);
 
+	thread_periods[2] = 100;
+	
     //Create Dynamic Model Thread
     
 	tp_mod.arg = 3;
@@ -124,6 +135,8 @@ int ret = 0;
 	tp_mod.dmiss = 0;
 
 	ret = thread_create (&tp_mod, &sched_mod, attr_mod, &tid_mod, lin_model_task);
+
+	thread_periods[3] = TP_MODEL;
 	
     //Create LQR Thread
     
@@ -135,6 +148,8 @@ int ret = 0;
 
 	ret = thread_create (&tp_lqr, &sched_lqr, attr_lqr, &tid_lqr, lqr_task);
 	
+	thread_periods[4] = TP_LQR;	
+	
 	//Create Laser scan Thread
     
 	tp_lsr.arg = 6;
@@ -143,8 +158,10 @@ int ret = 0;
 	tp_lsr.priority = 16;
 	tp_lsr.dmiss = 0;
 
-	ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
-    
+	//ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
+
+	thread_periods[5] = TP_LSR;
+	
     //Create Plotting Thread
     
 	tp_plt.arg = 5;
@@ -154,7 +171,9 @@ int ret = 0;
 	tp_plt.dmiss = 0;
 
 	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
-    
+
+	thread_periods[6] = TP_PLOTS;
+	
 	pthread_join (tid_pnt, NULL);
     pthread_join (tid_plt, NULL);
 	pthread_join (tid_lsr, NULL);
@@ -200,6 +219,8 @@ struct task_par* tp;
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
         
 	}while(!start_sim  && !end_sim);
 	
@@ -254,6 +275,8 @@ struct task_par* tp;
 			printf ("DEADLINE MISS: lin_model_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
 
 	}while(!end_sim && collision == 0);
 	
@@ -315,6 +338,9 @@ double error;
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
+		
 	}while(!start_sim && !end_sim);
     
     printf("LQR Controller task started\n");
@@ -353,6 +379,8 @@ double error;
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 		
 	}while(!end_sim  && collision == 0);
 
@@ -399,6 +427,8 @@ double rep_force_ampli = 0.0;
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 
 	}while(!start_sim && !end_sim);
     
@@ -436,6 +466,8 @@ double rep_force_ampli = 0.0;
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 		
 	}while(!end_sim && collision == 0);
 
@@ -513,6 +545,9 @@ BITMAP* expl;
 			printf ("DEADLINE MISS: gfx_task()\n");
 
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 0, &tp_changed);
+		
 	}while(!start_sim && !end_sim);
 	
 	show_mouse(NULL);
@@ -546,6 +581,8 @@ BITMAP* expl;
 			printf ("DEADLINE MISS: gfx_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 0, &tp_changed);
         
 	}while(!end_sim);
 	
@@ -593,12 +630,15 @@ double new_pose[SIZE_Y] = {0.0};
 			printf ("DEADLINE MISS: plt_task()\n");
 		
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 6, &tp_changed);
+		
 	}while(!start_sim && !end_sim);
     
     printf("Plotting task started\n");
 
 	do{
-	
+			
 		pthread_mutex_lock(&mux_state);
         
 		memcpy(new_pose, arr_state, sizeof(double) * SIZE_Y);
@@ -632,10 +672,12 @@ double new_pose[SIZE_Y] = {0.0};
 		
 		pthread_mutex_unlock(&mux_gfx);
 
-		if (deadline_miss (tp))		
+		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: plt_task()\n");
 
-		wait_for_period (tp);
+		wait_for_period(tp);
+
+		eval_period(tp, thread_periods, &selected_thread, 6, &tp_changed);
 
 	}while(!end_sim);
 	
@@ -706,6 +748,9 @@ int returned_col = 0;
 			printf ("DEADLINE MISS: point_task()\n");
 
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 2
+		, &tp_changed);
 
 	}while(!start_sim  && !end_sim);
 	
@@ -748,7 +793,56 @@ void* key_task(void* arg)
 			end_sim = 1;
 
 		if(key[KEY_ENTER])
+		{
 			start_sim = 1;
+			if (selected_thread < 99) tp_changed = 1;
+		}
+
+		if(key[KEY_0])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 0);
+		}
+		if(key[KEY_1])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 1);
+		}
+		if(key[KEY_2])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 2);
+		}
+		if(key[KEY_3])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 3);
+		}
+		if(key[KEY_4])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 4);
+		}
+		
+		if(key[KEY_5])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 5);
+		}
+			
+		if(key[KEY_6])
+		{
+			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 6);
+		}
+
+		if(key[KEY_BACKSPACE])
+		{
+			cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+		}
+			
+		if(key[KEY_UP])
+		{
+			modify_thread_tp(&selected_thread, thread_periods, 10);
+		}
+		
+		if(key[KEY_DOWN])
+		{
+			modify_thread_tp(&selected_thread, thread_periods, -10);
+		}
 		
 		// Check left mouse click
 		if(mouse_b & 1)
@@ -770,6 +864,8 @@ void* key_task(void* arg)
 		printf ("DEADLINE MISS: key_task()\n");
 
 		wait_for_period (tp);
+		
+		eval_period(tp, thread_periods, &selected_thread, 1, &tp_changed);
 
 	}while(!end_sim);
 

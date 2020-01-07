@@ -25,6 +25,7 @@
 #define TP_LQR 100
 #define TP_KEY 100
 
+#define THREAD_MAX_NUM 7
 /* --- Project functions --- */
 
 struct task_par {
@@ -48,9 +49,17 @@ void time_add_ms (struct timespec *t, int ms);
 
 int time_cmp (struct timespec t1, struct timespec t2);
 
+void eval_period(struct task_par *tp, int* arr_tp, int* sel_t, int t_idx, int *change_flag);
+
 void time_copy (struct timespec *td, struct timespec ts);
 
 int deadline_miss (struct task_par *tp);
+
+void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx);
+
+void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp);
+
+void modify_thread_tp(int* sel_t, int* tp_arr, int val);
 
 int thread_create (struct task_par *tp, struct sched_param *sp, pthread_attr_t att, pthread_t *tid, void* task);
 

@@ -5,3 +5,4 @@ task.o
 model.o
 graphics.o
 quadcopter-avoidance.kdev4
+bmp/quad2.jpg

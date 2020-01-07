@@ -51,6 +51,37 @@ int time_cmp(struct timespec t1, struct timespec t2)
 
 };
 
+void eval_period(struct task_par *tp, int* arr_tp, int* sel_t, int t_idx, int *change_flag)
+{
+	if(!*change_flag)
+		return;
+	
+	if(*sel_t != t_idx)
+		return;
+	
+	if(arr_tp[t_idx] == tp->period)
+		return;
+	
+	struct timespec t;
+	
+	tp->period = arr_tp[t_idx];
+	tp->deadline = arr_tp[t_idx];
+	
+	clock_gettime (CLOCK_MONOTONIC, &t);
+
+	time_copy (& (tp->at), t);
+	time_copy (& (tp->dl), t);
+
+	time_add_ms (& (tp->at), tp->period);
+	time_add_ms (& (tp->dl), tp->deadline);
+	
+	*change_flag = 0;
+	*sel_t = 99;
+	
+	printf("Task period changed to %d\n", tp->period);
+	
+};
+
 void time_copy (struct timespec *td, struct timespec ts)
 {
 
@@ -121,18 +152,61 @@ int result = -1;
 
 };
 
+void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
+{	
+	if(t_idx >= THREAD_MAX_NUM)
+	{
+		*sel_t = 99;
+		return;
+	}
+
+// 	if(*sel_t < 99)
+// 		tp_arr[t_idx] = *sel_t_old_tp;
+		
+	*sel_t = t_idx;
+	*sel_t_old_tp = tp_arr[*sel_t];
+	printf("Sel t: %d - tp: %d\n", *sel_t, tp_arr[*sel_t]);
+	
+};
+
+void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp)
+{
+	printf("Canc t: %d to tp %d\n", *sel_t, *sel_t_old_tp);
+	
+	tp_arr[*sel_t] = *sel_t_old_tp;
+	*sel_t = 99;
+}
+
+void modify_thread_tp(int* sel_t, int* tp_arr, int val)
+{
+	if(*sel_t >= 99)
+		return;
+	
+	if (tp_arr[*sel_t] + val <= 10 )
+		tp_arr[*sel_t] = 10;
+	else
+		tp_arr[*sel_t] += val;
+	
+	printf("Mod t: %d p: %d \n", *sel_t, tp_arr[*sel_t]);
+	
+}
+
 void shift_and_append (double *array, int size, double new_element)
 {
+	
 	for(int i = 1; i < size; i++)
 		array[i-1] = array[i];
+	
 	array[size-1] = new_element;
+	
 }
 
 void write_to_file (const char* filename, const char* text, int toappend)
 {
 	FILE *f_pointer;
 
-	if (toappend == 0){
+	if (toappend == 0)
+	{
 		f_pointer = fopen (filename, "w");
 	}
 	else
