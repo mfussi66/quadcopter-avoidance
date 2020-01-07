@@ -792,11 +792,13 @@ void* key_task(void* arg)
 		if(key[KEY_ESC])
 			end_sim = 1;
 
-		if(key[KEY_ENTER])
+		if(key[KEY_SPACE])
 		{
 			start_sim = 1;
-			if (selected_thread < 99) tp_changed = 1;
 		}
+		
+		if(key[KEY_ENTER])
+		if (selected_thread < 99) tp_changed = 1;
 
 		if(key[KEY_0])
 		{

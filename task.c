@@ -78,7 +78,7 @@ void eval_period(struct task_par *tp, int* arr_tp, int* sel_t, int t_idx, int *c
 	*change_flag = 0;
 	*sel_t = 99;
 	
-	printf("Task period changed to %d\n", tp->period);
+	printf("Task %d period changed to %d\n", t_idx, tp->period);
 	
 };
 
@@ -156,6 +156,7 @@ void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
 {	
 	if(t_idx >= THREAD_MAX_NUM)
 	{
+		printf("Thread %d selected does not exist\n", t_idx);
 		*sel_t = 99;
 		return;
 	}
