@@ -20,6 +20,7 @@
 #define OBS_NUM 2
 
 #define OFFSET_LASER 0
+#define N_BEAMS 5
 #define BEAM_DMIN 1
 #define BEAM_DMAX 10
 #define BEAM_DSTEP 1

@@ -211,17 +211,17 @@ void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 	old_X[0] = (int)(ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3]));
 	old_X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (old_pose[4]));
 	
-	for(int i = 0; i < 5; i++)
+	for(int i = 0; i < N_BEAMS; i++)
 	{
 		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3] + old[i].x);
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (old_pose[4] + old[i].y);
-		temp.z = old_pose[5] + old[i].z;
+		//temp.z = old_pose[5] + old[i].z;
 		
 		fastline(bmp, old_X[0], old_X[1], (int)temp.x, (int)temp.y, blk);
 
 		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + new[i].x);
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
-		temp.z = pose[5] + new[i].z;
+		//temp.z = pose[5] + new[i].z;
 		
 		//printf("print %d, x: %d, y: %d xd: %f yd: %f \n", i, (int)temp.x,(int)temp.y, new[i].x,new[i].y);
 		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, red);

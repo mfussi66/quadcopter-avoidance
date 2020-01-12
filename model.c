@@ -115,9 +115,9 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 	
 	for(int i = 0; i < n; i++)
 	{
-		tr[i].x = 0.0;
-		tr[i].y = 0.0;
-		tr[i].z = 0.0;
+		tr[i].x = BEAM_DMIN;
+		tr[i].y = BEAM_DMIN;
+		tr[i].z = BEAM_DMIN;
 		
 		//printf("beam %d, x: %f, y: %f \n", i,tr[i].x,tr[i].y);
 	}
@@ -144,7 +144,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 	{
 		obj_found = 0;
 		
-		for(int d = BEAM_DMIN; (d <= BEAM_DMAX) && (obj_found == 0); d += BEAM_DSTEP)
+		for(int d = BEAM_DMIN; d <= BEAM_DMAX; d += BEAM_DSTEP)
 		{	
 			temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + d * cos(deg2rad(a) + yaw));
 			temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + d * sin(deg2rad(a) + yaw));
@@ -156,7 +156,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			if (getpixel(bmp, (int)temp.x, (int)temp.y) ==  COL_GREEN)
 			{
 				//printf("Beam %d found: x: %f y: %f \n", i, temp.x, temp.y);
-				obj_found = 1;
+				break;
 			}
 		}
 		//printf("beam %d, a: %d x: %f, y: %f \n", i, a, temp.x,temp.y);

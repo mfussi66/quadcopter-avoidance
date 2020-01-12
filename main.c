@@ -13,6 +13,9 @@ double arr_forces[SIZE_U] = {0.0};
 double arr_repulsive_forces[SIZE_U] = {0.0};
 double arr_error[SIZE_X] = {0.0};
 
+Trace arr_traces[N_BEAMS];
+Trace arr_old_traces[N_BEAMS];
+
 WPoint waypoints[5] = {{-9999}, {-9999}};
 
 Obstacle arr_obstacles[OBS_NUM];
@@ -51,6 +54,7 @@ pthread_mutex_t mux_rep_forces;
 pthread_mutex_t mux_state;
 pthread_mutex_t mux_gfx;
 pthread_mutex_t mux_points;
+pthread_mutex_t mux_laser;
 
 pthread_mutexattr_t muxattr;
 
@@ -87,7 +91,8 @@ int ret = 0;
 	mutex_create (mux_state, muxattr, 0, 100);
 	mutex_create (mux_points, muxattr, 0, 100);
 	mutex_create (mux_gfx, muxattr, 0, 100);
-		
+	mutex_create (mux_laser, muxattr, 0, 100);
+	
 	pthread_mutexattr_destroy (&muxattr);
 	
 	//Create Graphics Thread
@@ -119,7 +124,7 @@ int ret = 0;
 
 	//Create Laser scan Thread
 	set_task_params(&tp_lsr, 6, TP_LSR, TP_LSR, 16);
-	//ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
+	ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
 	thread_periods[5] = TP_LSR;
 
 	//Create Plotting Thread
@@ -140,6 +145,7 @@ int ret = 0;
 	pthread_mutex_destroy(&mux_points);
 	pthread_mutex_destroy(&mux_forces);
 	pthread_mutex_destroy(&mux_state);
+	pthread_mutex_destroy(&mux_laser);
 	pthread_mutex_destroy(&mux_gfx);
 	pthread_mutex_destroy(&mux_rep_forces);
 
@@ -337,8 +343,8 @@ struct task_par* tp;
 
 double aperture;
 int n_traces;
-Trace laser_traces[5];
-Trace old_traces[5];
+Trace laser_traces[N_BEAMS];
+Trace old_traces[N_BEAMS];
 double initialpose[6] = {0.0};
 double old_pose[6] = {0.0};
 double pose[6] = {0.0};
@@ -350,11 +356,12 @@ double rep_force_ampli = 0.0;
 	tp = (struct task_par *)arg;
 	
 	aperture = 150;
-	n_traces = 5;
+	n_traces = N_BEAMS;
 	
 	set_period (tp);
 		
-	init_laser_scanner(laser_traces, n_traces, aperture, initialpose);
+	init_laser_scanner(laser_traces, N_BEAMS, aperture, initialpose);
+	init_laser_scanner(old_traces, N_BEAMS, aperture, initialpose);
 	
 	do{
 
@@ -374,20 +381,21 @@ double rep_force_ampli = 0.0;
 		memcpy(old_pose, pose, sizeof(double) * SIZE_Y);
 		memcpy(pose, arr_state, sizeof(double) * SIZE_Y);
 		pthread_mutex_unlock(&mux_state);
-
+		
+		memcpy(old_traces, laser_traces, sizeof(Trace) * N_BEAMS);
+		
 		pthread_mutex_lock(&mux_gfx);
-		memcpy(old_traces, laser_traces, sizeof(double) * 3 * n_traces);
-		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, n_traces);
+		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, N_BEAMS);
 		pthread_mutex_unlock(&mux_gfx);
 
-		pthread_mutex_lock(&mux_forces);
-		compute_repulsive_force(laser_traces, n_traces, pose, rep_forces_xyz);
+		pthread_mutex_lock(&mux_rep_forces);
+		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
 		
 		rep_forces[0] = 0.001 * rep_forces_xyz[1]; //tau_roll
 		rep_forces[1] = 0.001 * rep_forces_xyz[0]; //tau_pitch
 		
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
-		pthread_mutex_unlock(&mux_forces);
+		pthread_mutex_unlock(&mux_rep_forces);
 
   		//printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
  		//printf("---\n");
@@ -492,11 +500,10 @@ BITMAP* expl;
 	show_mouse(NULL);
 	
 	do{
-		
-		pthread_mutex_lock(&mux_state);
+		pthread_mutex_lock(&mux_state);		
 		memcpy(old_pose, curr_pose, sizeof(double) * SIZE_Y);
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
-		pthread_mutex_unlock(&mux_state); 
+		pthread_mutex_unlock(&mux_state);
 	
 		build_gui(buffer_gfx, font, COL_GREEN);
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
@@ -509,11 +516,9 @@ BITMAP* expl;
 			draw_quad(buffer_gfx, quad, quad_bg, old_pose, curr_pose);
 		else
 			draw_pose(buffer_gfx, old_pose, curr_pose);
-		
+			
         pthread_mutex_lock(&mux_gfx);
-
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-             
 		pthread_mutex_unlock(&mux_gfx);
 		
 		if (deadline_miss (tp))
