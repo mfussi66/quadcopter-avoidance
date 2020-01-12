@@ -172,18 +172,19 @@ struct task_par* tp;
         
 	}while(!start_sim  && !end_sim);
 	
-	// Set initial state from waypoints array
-	gsl_vector_set(state, 3, (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE);
-	gsl_vector_set(state, 4, (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE);
-	gsl_vector_set(state, 5, 0);
-	memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
-    
-    read_matrix_file("A.bin", A);
-	read_matrix_file("B.bin", B);
-    
-    printf("Dynamic model task started\n");
-
-	printf("init_s: (%.2f, %.2f)\n", gsl_vector_get(state, 3), gsl_vector_get(state, 4));
+	if(start_sim)
+	{
+		// Set initial state from waypoints array	
+		gsl_vector_set(state, 3, (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE);
+		gsl_vector_set(state, 4, (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE);
+		gsl_vector_set(state, 5, 0);
+		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
+		
+		read_matrix_file("A.bin", A);
+		read_matrix_file("B.bin", B);
+		
+		printf("Dynamic model task started\n");
+	}
 	
     do{
 		
@@ -260,25 +261,13 @@ gsl_vector_view state_view;
 
 int waypoint_flags[MAX_WPOINTS] = {0};
 int waypoint_idx = 1;
-int sp_selected = 0;
 double dist = 0.0;
-
-double error;
 	
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
 
 	read_matrix_file("K.bin", K);
-	
-// 	gsl_vector_set(setpoint, 2, M_PI/4);
-// 	gsl_vector_set(setpoint, 3, 30);
-// 	gsl_vector_set(setpoint, 4, 30);
-// 	gsl_vector_set(setpoint, 5, 10);
-// 	gsl_vector_set(altitude_sp, 5, 10);
-/*	
-	gsl_vector_set(yaw_sp, 5, 10);
-	gsl_vector_set(yaw_sp, 2, M_PI/2);*/
 	
 	do{
 		if (deadline_miss (tp))
@@ -289,9 +278,11 @@ double error;
 		
 	}while(!start_sim && !end_sim);
     
-    printf("LQR Controller task started\n");
-	
-	compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
+	if(start_sim)
+	{
+		printf("LQR Controller task started\n");	
+		compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
+	}
 	
 	do{
 		
@@ -664,7 +655,6 @@ struct task_par* tp;
 			//printf("L clicked\n");
 			pthread_mutex_lock(&mux_points);
 			add_waypoint(buffer_gfx, waypoints, &waypoints_num, Lmouse);
-			printf("Click on waypoint %d\n", waypoints_num + 1);
 			pthread_mutex_unlock(&mux_points);
 		}
 		
@@ -690,11 +680,11 @@ struct task_par* tp;
 
 	}while(!start_sim  && !end_sim);
 	
-	printf("Waypoints selection completed: found %d.\n", waypoints_num + 1);
+	printf("Waypoints selection completed: found %d goals\n", waypoints_num);
 	
-	for(int i = 0; i< MAX_WPOINTS; i++)
-		printf("wp1 %d: (%.1f, %.1f)\n",i, waypoints[i].x, waypoints[i].y);
-	
+// 	for(int i = 0; i< MAX_WPOINTS; i++)
+// 		printf("Points %d: (%.1f, %.1f)\n",i, waypoints[i].x, waypoints[i].y);
+// 	
 	
 	usleep(1e6);
 

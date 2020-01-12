@@ -108,7 +108,7 @@ void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 	
 	if (n >= MAX_WPOINTS)
 	{
-		printf("Max n. of waypoints reached (5)\n Press SPACE to start\n");
+		printf("Max n. of waypoints reached (5)\nPress SPACE to start\n");
 		return;
 	}
 	
@@ -118,9 +118,12 @@ void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 		return;
 	}
 	
+	if(n < MAX_WPOINTS - 1)
+		printf("Click on waypoint %d\n", n + 1);
+	
 	array[n].x = point.x;
 	array[n].y = point.y;
-
+	
 	*num = n;
 }
 
@@ -298,10 +301,6 @@ int red = makecol(255, 0, 0);
 		if (old_wpoints[i].x <=-9999) continue;
 		circlefill(bmp, old_wpoints[i].x, old_wpoints[i].y, 4, blk);
 	}
-
-	// Draw new waypoints
-// 	x = ENV_OFFSET_X + ENV_SCALE * wpoints[0].x;
-// 	y = ENV_OFFSET_Y - ENV_SCALE * wpoints[0].y;
 	
 	if (size < 0) return;
 	if (size >= MAX_WPOINTS) return;
@@ -314,21 +313,6 @@ int red = makecol(255, 0, 0);
 			circlefill(bmp, wpoints[i].x, wpoints[i].y, 4, red);
 		
 	}
-	
-/*	
-	x = wpoints[0].x;
-	y = wpoints[0].y;
-	
-	circlefill();
-	
-	for(int i = 1; i < size + 1; i++)
-	{
-// 		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
-// 		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;
-		x = wpoints[i].x;
-		y = wpoints[i].y;	
-		circlefill(bmp, x, y, 4, red);
-	}*/
 	
 }
 
