@@ -25,7 +25,7 @@ int gfx_initialized = 0;
 int key_initialized = 0;
 int gfx_enabled = 0;
 int key_enabled = 0;
-int waypoints_num = 0;
+int waypoints_num = -1;
 
 int tp_changed = 0;
 int selected_thread = 99;
@@ -50,6 +50,7 @@ pthread_mutex_t mux_forces;
 pthread_mutex_t mux_rep_forces;
 pthread_mutex_t mux_state;
 pthread_mutex_t mux_gfx;
+pthread_mutex_t mux_points;
 
 pthread_mutexattr_t muxattr;
 
@@ -81,121 +82,69 @@ pthread_t tid_key, tid_lsr, tid_pnt;
 
 int ret = 0;
 
-    mutex_create (mux_forces, muxattr, 0, 100);
+	mutex_create (mux_forces, muxattr, 0, 100);
 	mutex_create (mux_rep_forces, muxattr, 0, 100);
-    mutex_create (mux_state, muxattr, 0, 100);
+	mutex_create (mux_state, muxattr, 0, 100);
+	mutex_create (mux_points, muxattr, 0, 100);
 	mutex_create (mux_gfx, muxattr, 0, 100);
-	 
+		
 	pthread_mutexattr_destroy (&muxattr);
 	
 	//Create Graphics Thread
-    
-    start_allegro();
-    
-	tp_gfx.arg = 1;
-	tp_gfx.period = TP_GFX;
-	tp_gfx.deadline = TP_GFX * 1;
-	tp_gfx.priority = 7;
-	tp_gfx.dmiss = 0;
-
+	start_allegro();
+	
+	set_task_params(&tp_gfx, 1, TP_GFX, TP_GFX, 7);
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
-
 	thread_periods[0] = TP_GFX;
-	
-   	//Create Keyboard Thread
-    
-	tp_key.arg = 2;
-	tp_key.period = TP_KEY;
-	tp_key.deadline = TP_KEY * 1;
-	tp_key.priority = 6;
-	tp_key.dmiss = 0;
 
+	//Create Keyboard Thread
+	set_task_params(&tp_key, 2, TP_KEY, TP_KEY, 6);
 	ret = thread_create (&tp_key, &sched_key, attr_key, &tid_key, key_task);
-
 	thread_periods[1] = TP_KEY;
-	
+
 	//Create Waypoint selection Thread
-    
-	tp_pnt.arg = 7;
-	tp_pnt.period = 100;
-	tp_pnt.deadline = 100 * 1;
-	tp_pnt.priority = 2;
-	tp_pnt.dmiss = 0;
-
+	set_task_params(&tp_pnt, 7, TP_POINT, TP_POINT, 2);
 	ret = thread_create (&tp_pnt, &sched_pnt, attr_pnt, &tid_pnt, point_task);
+	thread_periods[2] = TP_POINT;
 
-	thread_periods[2] = 100;
-	
-    //Create Dynamic Model Thread
-    
-	tp_mod.arg = 3;
-	tp_mod.period = TP_MODEL;
-	tp_mod.deadline = TP_MODEL * 1;
-	tp_mod.priority = 20;
-	tp_mod.dmiss = 0;
-
+	//Create Dynamic Model Thread
+	set_task_params(&tp_mod, 3, TP_MODEL, TP_MODEL, 20);
 	ret = thread_create (&tp_mod, &sched_mod, attr_mod, &tid_mod, lin_model_task);
-
 	thread_periods[3] = TP_MODEL;
-	
-    //Create LQR Thread
-    
-	tp_lqr.arg = 4;
-	tp_lqr.period = TP_LQR;
-	tp_lqr.deadline = TP_LQR * 1;
-	tp_lqr.priority = 19;
-	tp_lqr.dmiss = 0;
 
+	//Create LQR Thread
+	set_task_params(&tp_lqr, 4, TP_LQR, TP_LQR, 19);
 	ret = thread_create (&tp_lqr, &sched_lqr, attr_lqr, &tid_lqr, lqr_task);
-	
 	thread_periods[4] = TP_LQR;	
-	
+
 	//Create Laser scan Thread
-    
-	tp_lsr.arg = 6;
-	tp_lsr.period = TP_LSR;
-	tp_lsr.deadline = TP_LSR * 1;
-	tp_lsr.priority = 16;
-	tp_lsr.dmiss = 0;
-
+	set_task_params(&tp_lsr, 6, TP_LSR, TP_LSR, 16);
 	//ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
-
 	thread_periods[5] = TP_LSR;
-	
-    //Create Plotting Thread
-    
-	tp_plt.arg = 5;
-	tp_plt.period = TP_PLOTS;
-	tp_plt.deadline = TP_PLOTS * 1;
-	tp_plt.priority = 5;
-	tp_plt.dmiss = 0;
 
+	//Create Plotting Thread
+	set_task_params(&tp_plt, 5, TP_PLOTS, TP_PLOTS, 5);
 	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
-
 	thread_periods[6] = TP_PLOTS;
-	
+
 	pthread_join (tid_pnt, NULL);
-    pthread_join (tid_plt, NULL);
+	pthread_join (tid_plt, NULL);
 	pthread_join (tid_lsr, NULL);
-    pthread_join (tid_lqr, NULL);
-    pthread_join (tid_mod, NULL);
-    pthread_join (tid_key, NULL);
+	pthread_join (tid_lqr, NULL);
+	pthread_join (tid_mod, NULL);
+	pthread_join (tid_key, NULL);
 	pthread_join (tid_gfx, NULL);
-    
-    close_allegro();
-    /*
-    pthread_attr_destroy (&attr_plt);
-	pthread_attr_destroy (&attr_lqr);
-    pthread_attr_destroy (&attr_mod);	
-    pthread_attr_destroy (&attr_key);
-    pthread_attr_destroy (&attr_gfx);
-    */
-    pthread_mutex_destroy(&mux_forces);
-    pthread_mutex_destroy(&mux_state);
-    pthread_mutex_destroy(&mux_gfx);
-    
+
+	close_allegro();
+
+	pthread_mutex_destroy(&mux_points);
+	pthread_mutex_destroy(&mux_forces);
+	pthread_mutex_destroy(&mux_state);
+	pthread_mutex_destroy(&mux_gfx);
+	pthread_mutex_destroy(&mux_rep_forces);
+
 	return 0;
-    
+
 }
 
 
@@ -216,7 +165,7 @@ struct task_par* tp;
 	do{
 
 		if (deadline_miss (tp))
-			printf ("DEADLINE MISS: lin_model_task()\n");
+			printf ("DEADLINE MISS: model_task()\n");
 		
 		wait_for_period (tp);
 		
@@ -272,7 +221,7 @@ struct task_par* tp;
 		pthread_mutex_unlock (&mux_state);
 		
 		if (deadline_miss (tp))		
-			printf ("DEADLINE MISS: lin_model_task()\n");
+			printf ("DEADLINE MISS: model_task()\n");
 		
 		wait_for_period (tp);
 		
@@ -311,7 +260,7 @@ gsl_vector* yaw_sp = gsl_vector_calloc(SIZE_X);
 gsl_matrix* K = gsl_matrix_calloc(SIZE_U, SIZE_X);
 gsl_vector_view state_view;
 
-int waypoint_flags[4] = {0};
+int waypoint_flags[MAX_WPOINTS] = {0};
 int waypoint_idx = 1;
 int sp_selected = 0;
 double dist = 0.0;
@@ -354,7 +303,7 @@ double error;
 
 		dist = compute_pos_dist(setpoint, &state_view.vector);
 
-		if(dist <= 0.4 && waypoint_idx < (waypoints_num - 1))
+		if(dist <= 0.4 && waypoint_idx < waypoints_num)
 		{
 			printf("Waypoint %d reached\n", waypoint_idx);
 			gsl_vector_set(setpoint, 5, altitude_sp);
@@ -373,7 +322,7 @@ double error;
 		
 // 		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
 // 			   arr_forces[0], arr_forces[1], arr_forces[2], arr_forces[3]);
-// 		
+		
 		pthread_mutex_unlock (&mux_forces);
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
@@ -492,8 +441,8 @@ int gui_color =  makecol(0, 255, 0);
 int ret_obs = 0;
 double old_pose[SIZE_Y] = {0.0};
 double curr_pose[SIZE_Y] = {0.0};
-WPoint curr_waypoints[5];
-WPoint old_waypoints[5];
+WPoint curr_waypoints[MAX_WPOINTS];
+WPoint old_waypoints[MAX_WPOINTS];
 
 BITMAP* quad;
 BITMAP* quad_bg;
@@ -502,6 +451,12 @@ BITMAP* expl;
 	tp = (struct task_par *)arg;
 	
 	set_period (tp);
+	
+	for(int i = 0; i < MAX_WPOINTS; i++)
+	{
+		curr_waypoints[i].x= -9999;
+		curr_waypoints[i].y = -9999;
+	}
 
 	buffer_gfx = create_bitmap(SCREEN_W, SCREEN_H);
 	
@@ -517,27 +472,27 @@ BITMAP* expl;
 	quad = load_bmp("bmp/quad.bmp", NULL);
 	quad_bg = load_bmp("bmp/black.bmp", NULL);
 	expl = load_bmp("bmp/expl.bmp", NULL);
-	
-	gfx_enabled = 1;
-	
+
 	if(quad == NULL)
 		printf("Drone sprite not found!\n");
+	
+	gfx_enabled = 1;
 	
 	show_mouse(buffer_gfx);
 	
 	do{
-		scare_mouse();
-		
+
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
 		
-		memcpy(old_waypoints, curr_waypoints, sizeof(WPoint) * 5);
-		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * 5);
+		pthread_mutex_lock(&mux_points);
+		memcpy(old_waypoints, curr_waypoints, sizeof(WPoint) * MAX_WPOINTS);
+		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * MAX_WPOINTS);
+		pthread_mutex_unlock(&mux_points);
 		
+		scare_mouse();
 		pthread_mutex_lock(&mux_gfx);
-		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
-
+		draw_waypoints(buffer_gfx, old_waypoints, curr_waypoints, waypoints_num);
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-		
 		pthread_mutex_unlock(&mux_gfx);
 		unscare_mouse();
 		
@@ -703,44 +658,36 @@ int returned_col = 0;
 	tp = (struct task_par *)arg;
 
 	set_period (tp);
-
+	
+	for(int i = 0; i < MAX_WPOINTS; i++)
+	{
+		waypoints[i].x = -9999;
+		waypoints[i].y = -9999;
+	}
+	
 	printf("Waypoint task started\n");
 
 	printf("Click on starting point\n");
 	
 	do{
-		pthread_mutex_lock(&mux_gfx);
-		if(Lmouse_clicked && 
-			getpixel(buffer_gfx, Lmouse.x, Lmouse.y) != obs_col &&
-			waypoints_num <= 4)
+		
+		if(Lmouse_clicked)
 		{
-			
-			waypoints[waypoints_num].x = (Lmouse.x - ENV_OFFSET_X) / ENV_SCALE;
-			waypoints[waypoints_num].y = (ENV_OFFSET_Y - Lmouse.y) / ENV_SCALE;
-			waypoints_num++;
+			printf("L clicked\n");
+			pthread_mutex_lock(&mux_points);
+			add_waypoint(buffer_gfx, waypoints, &waypoints_num, Lmouse);
 			printf("Click on waypoint %d\n", waypoints_num);
+			pthread_mutex_unlock(&mux_points);
 		}
 		
 		if(Rmouse_clicked)
 		{
-			returned_col = getpixel(buffer_gfx, Rmouse.x, Rmouse.y);
-			if (returned_col == wp_col || returned_col == start_col)
-			{
-				waypoints[waypoints_num].x = -9999;
-				waypoints[waypoints_num].y = -9999;
-				if (waypoints_num <= 0) 
-					waypoints_num = 0;
-				else
-					waypoints_num--;
-			}
+			printf("R clicked\n");
+			pthread_mutex_lock(&mux_points);
+			del_waypoint(buffer_gfx, waypoints, &waypoints_num, Rmouse);
+			pthread_mutex_unlock(&mux_points);
 		}
-		pthread_mutex_unlock(&mux_gfx);
 		
-		if (waypoints_num > 4)
-		{
-			printf("Maximum number of waypoints reached (4)\n Press ENTER to start the simulation\n");
-			
-		}
 		Lmouse_clicked = 0;
 		Rmouse_clicked = 0;
 
@@ -749,12 +696,11 @@ int returned_col = 0;
 
 		wait_for_period (tp);
 		
-		eval_period(tp, thread_periods, &selected_thread, 2
-		, &tp_changed);
+		eval_period(tp, thread_periods, &selected_thread, 2, &tp_changed);
 
 	}while(!start_sim  && !end_sim);
 	
-	printf("Waypoints selection completed: found %d.\n", waypoints_num - 1);
+	printf("Waypoints selection completed: found %d.\n", waypoints_num);
 	
 	usleep(1e6);
 

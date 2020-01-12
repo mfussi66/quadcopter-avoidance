@@ -101,6 +101,47 @@ void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col)
 	
 }
 
+void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
+{
+	
+	int n = *num + 1;
+	
+	if (n >= MAX_WPOINTS)
+	{
+		printf("Max n. of waypoints reached (5)\n Press SPACE to start\n");
+		return;
+	}
+	
+	if (getpixel(bmp, point.x, point.y) == makecol(0, 255, 0))
+	{
+		printf("Cannot place waypoint on obstacle\n");
+		return;
+	}
+	
+	array[n].x = (point.x - ENV_OFFSET_X) / ENV_SCALE;
+	array[n].y = (ENV_OFFSET_Y - point.y) / ENV_SCALE;
+
+	*num = n;
+	
+}
+
+void del_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
+{
+int clicked_col;
+int n = *num;
+	
+	if (n < 0) return;
+	
+	clicked_col = getpixel(bmp, point.x, point.y);
+	if (clicked_col == makecol(255, 0, 0) || 
+		clicked_col == makecol(0, 255, 255)) 
+	{
+		array[n].x = -9999;
+		array[n].y = -9999;
+		printf("Waypoint %d deleted\n", n);
+		*num = n - 1;
+	}
+}
 
 int waypoints_filled(WPoint *array, int size)
 {
@@ -206,14 +247,11 @@ void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)
 
 int x;
 int y;
-
-int x_old;
-int y_old;
-
 int blk = makecol(0, 0, 0);
 int red = makecol(255, 0, 0);
 
-	if (size == 0) return;
+	if (size < 0) return;
+	if (size >= MAX_WPOINTS) return;
 	
 	// Draw black on old waypoints
 	for(int i = 0; i < 5; i++)
@@ -230,10 +268,7 @@ int red = makecol(255, 0, 0);
 	
 	circlefill(bmp, x, y, 5, makecol(0, 255, 255));
 	
-	x_old = x;
-	y_old = y;
-	
-	for(int i = 1; i < size; i++)
+	for(int i = 1; i < size + 1; i++)
 	{
 		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
 		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;

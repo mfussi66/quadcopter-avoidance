@@ -42,8 +42,10 @@ void compute_setpoint(Vector* sp, WPoint* wp, int wp_size, int* wp_flags)
 {
 	
 WPoint xy_setpoint;
+
+	if (wp_size >= MAX_WPOINTS) return;
 	
-	for(int i = 1; i < wp_size; i++)
+	for(int i = 1; i <= wp_size; i++)
 	{
 		if(wp_flags[i] == 0)
 		{

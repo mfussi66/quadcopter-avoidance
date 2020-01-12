@@ -16,6 +16,7 @@
 #define ENV_OFFSET_Y 575
 #define ENV_SCALE 10
 
+#define MAX_WPOINTS 5
 #define OBS_NUM 2
 
 #define OFFSET_LASER 0

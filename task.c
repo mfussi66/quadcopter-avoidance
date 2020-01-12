@@ -6,6 +6,16 @@
 
 /* Task Management */
 
+void set_task_params(struct task_par *tp, int arg, int per, int dl, int prio)
+{
+	tp->arg = arg;
+	tp->period = per;
+	tp->deadline = dl;
+	tp->priority = prio;
+	tp->dmiss = 0;
+	
+}
+
 void set_period (struct task_par *tp)
 {
 struct timespec t;
@@ -161,9 +171,6 @@ void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
 		return;
 	}
 
-// 	if(*sel_t < 99)
-// 		tp_arr[t_idx] = *sel_t_old_tp;
-		
 	*sel_t = t_idx;
 	*sel_t_old_tp = tp_arr[*sel_t];
 	printf("Sel t: %d - tp: %d\n", *sel_t, tp_arr[*sel_t]);
@@ -172,6 +179,8 @@ void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
 
 void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp)
 {
+	if(*sel_t >= 99) return;
+	
 	printf("Canc t: %d to tp %d\n", *sel_t, *sel_t_old_tp);
 	
 	tp_arr[*sel_t] = *sel_t_old_tp;
@@ -180,8 +189,7 @@ void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp)
 
 void modify_thread_tp(int* sel_t, int* tp_arr, int val)
 {
-	if(*sel_t >= 99)
-		return;
+	if(*sel_t >= 99) return;
 	
 	if (tp_arr[*sel_t] + val <= 10 )
 		tp_arr[*sel_t] = 10;
