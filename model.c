@@ -38,7 +38,7 @@ double compute_pos_dist(Vector* v1, Vector* v2)
  * ---------------------------
  * 
  */
-void compute_setpoint(Vector* sp, WPoint* wp, int wp_size, int* wp_flags)
+void compute_setpoint(Vector* sp, WPoint* wp, double alt, int wp_size, int* wp_flags)
 {
 	
 WPoint xy_setpoint;
@@ -49,14 +49,15 @@ WPoint xy_setpoint;
 	{
 		if(wp_flags[i] == 0)
 		{
-			xy_setpoint.x = wp[i].x;
-			xy_setpoint.y = wp[i].y;
+			xy_setpoint.x = (wp[i].x - ENV_OFFSET_X) / ENV_SCALE;
+			xy_setpoint.y = (ENV_OFFSET_Y - wp[i].y) / ENV_SCALE;
 			break;
 		}	
 	}
 	
 	gsl_vector_set(sp, 3, xy_setpoint.x);
 	gsl_vector_set(sp, 4, xy_setpoint.y);
+	gsl_vector_set(sp, 5, alt);
 	
 	//TODO compute reference yaw
 	

@@ -168,14 +168,13 @@ struct task_par* tp;
 			printf ("DEADLINE MISS: model_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
         
 	}while(!start_sim  && !end_sim);
 	
 	// Set initial state from waypoints array
-	gsl_vector_set(state, 3, waypoints[0].x);
-	gsl_vector_set(state, 4, waypoints[0].y);
+	gsl_vector_set(state, 3, (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE);
+	gsl_vector_set(state, 4, (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE);
 	gsl_vector_set(state, 5, 0);
 	memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
     
@@ -184,7 +183,7 @@ struct task_par* tp;
     
     printf("Dynamic model task started\n");
 
-	printf("init_s: (%f, %f)\n",gsl_vector_get(state, 3), gsl_vector_get(state, 4));
+	printf("init_s: (%.2f, %.2f)\n", gsl_vector_get(state, 3), gsl_vector_get(state, 4));
 	
     do{
 		
@@ -224,7 +223,6 @@ struct task_par* tp;
 			printf ("DEADLINE MISS: model_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
 
 	}while(!end_sim && collision == 0);
@@ -287,14 +285,13 @@ double error;
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 		
 	}while(!start_sim && !end_sim);
     
     printf("LQR Controller task started\n");
 	
-	compute_setpoint(setpoint, waypoints, waypoints_num, waypoint_flags);
+	compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
 	
 	do{
 		
@@ -303,14 +300,12 @@ double error;
 
 		dist = compute_pos_dist(setpoint, &state_view.vector);
 
-		if(dist <= 0.4 && waypoint_idx < waypoints_num)
+		if(dist <= 0.3 && waypoint_idx < waypoints_num)
 		{
 			printf("Waypoint %d reached\n", waypoint_idx);
-			gsl_vector_set(setpoint, 5, altitude_sp);
 			waypoint_flags[waypoint_idx] = 1;
 			waypoint_idx++;
-			compute_setpoint(setpoint, waypoints, waypoints_num, waypoint_flags);
-			//printf("sp: (%f, %f)\n", gsl_vector_get(setpoint, 3), gsl_vector_get(setpoint, 4));
+			compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
 		}
 		
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
@@ -324,11 +319,11 @@ double error;
 // 			   arr_forces[0], arr_forces[1], arr_forces[2], arr_forces[3]);
 		
 		pthread_mutex_unlock (&mux_forces);
+		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lqr_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 		
 	}while(!end_sim  && collision == 0);
@@ -376,7 +371,6 @@ double rep_force_ampli = 0.0;
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 
 	}while(!start_sim && !end_sim);
@@ -415,7 +409,6 @@ double rep_force_ampli = 0.0;
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 		
 	}while(!end_sim && collision == 0);
@@ -487,14 +480,14 @@ BITMAP* expl;
 		pthread_mutex_lock(&mux_points);
 		memcpy(old_waypoints, curr_waypoints, sizeof(WPoint) * MAX_WPOINTS);
 		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * MAX_WPOINTS);
-		pthread_mutex_unlock(&mux_points);
-		
-		scare_mouse();
-		pthread_mutex_lock(&mux_gfx);
 		draw_waypoints(buffer_gfx, old_waypoints, curr_waypoints, waypoints_num);
+		pthread_mutex_unlock(&mux_points);
+
+		pthread_mutex_lock(&mux_gfx);		
+		scare_mouse();
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-		pthread_mutex_unlock(&mux_gfx);
 		unscare_mouse();
+		pthread_mutex_unlock(&mux_gfx);
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: gfx_task()\n");
@@ -650,11 +643,6 @@ void* point_task(void* arg)
 {
 struct task_par* tp;
 
-int wp_col = makecol(255, 0, 0);
-int start_col = makecol(0, 255, 255);
-int obs_col = makecol(0, 255, 0);
-int returned_col = 0;
-
 	tp = (struct task_par *)arg;
 
 	set_period (tp);
@@ -673,19 +661,21 @@ int returned_col = 0;
 		
 		if(Lmouse_clicked)
 		{
-			printf("L clicked\n");
+			//printf("L clicked\n");
 			pthread_mutex_lock(&mux_points);
 			add_waypoint(buffer_gfx, waypoints, &waypoints_num, Lmouse);
-			printf("Click on waypoint %d\n", waypoints_num);
+			printf("Click on waypoint %d\n", waypoints_num + 1);
 			pthread_mutex_unlock(&mux_points);
 		}
 		
 		if(Rmouse_clicked)
 		{
-			printf("R clicked\n");
+			//printf("R clicked\n");
 			pthread_mutex_lock(&mux_points);
+			pthread_mutex_lock(&mux_gfx);
 			del_waypoint(buffer_gfx, waypoints, &waypoints_num, Rmouse);
 			pthread_mutex_unlock(&mux_points);
+			pthread_mutex_unlock(&mux_gfx);
 		}
 		
 		Lmouse_clicked = 0;
@@ -700,7 +690,11 @@ int returned_col = 0;
 
 	}while(!start_sim  && !end_sim);
 	
-	printf("Waypoints selection completed: found %d.\n", waypoints_num);
+	printf("Waypoints selection completed: found %d.\n", waypoints_num + 1);
+	
+	for(int i = 0; i< MAX_WPOINTS; i++)
+		printf("wp1 %d: (%.1f, %.1f)\n",i, waypoints[i].x, waypoints[i].y);
+	
 	
 	usleep(1e6);
 

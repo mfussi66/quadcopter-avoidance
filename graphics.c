@@ -15,9 +15,9 @@ void start_allegro (void)
     install_keyboard();
 	install_mouse();
 	
-	enable_hardware_cursor();
+	//enable_hardware_cursor();
     
-    clear_to_color (screen, 0);
+    clear_to_color(screen, 0);
     
 	printf ("Allegro correctly initialized\n");
 
@@ -118,41 +118,81 @@ void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 		return;
 	}
 	
-	array[n].x = (point.x - ENV_OFFSET_X) / ENV_SCALE;
-	array[n].y = (ENV_OFFSET_Y - point.y) / ENV_SCALE;
+	array[n].x = point.x;
+	array[n].y = point.y;
 
 	*num = n;
-	
 }
 
 void del_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 {
 int clicked_col;
 int n = *num;
-	
+int min_dist_idx;
+int j = 0;
+double dist = 0;
+double xy_dist[2] = {0};
+double curr_max_dist = 0;
+WPoint tmp_new_array[MAX_WPOINTS];
+
 	if (n < 0) return;
 	
-	clicked_col = getpixel(bmp, point.x, point.y);
-	if (clicked_col == makecol(255, 0, 0) || 
-		clicked_col == makecol(0, 255, 255)) 
+	curr_max_dist = sqrt(ENV_OFFSET_X * ENV_OFFSET_X + ENV_OFFSET_Y * ENV_OFFSET_Y) + 10;
+	clicked_col = getpixel(bmp, (int)point.x, (int)point.y);
+	memcpy(tmp_new_array, array, sizeof(WPoint) * MAX_WPOINTS);
+	
+	if (clicked_col == makecol(255, 0, 0) || clicked_col == makecol(0, 255, 255)) 
 	{
-		array[n].x = -9999;
-		array[n].y = -9999;
-		printf("Waypoint %d deleted\n", n);
+		for(int i = 0; i < MAX_WPOINTS; i++)
+		{
+			xy_dist[0] = point.x - tmp_new_array[i].x;
+			xy_dist[1] = point.y - tmp_new_array[i].y;
+
+			dist = sqrt(xy_dist[0] * xy_dist[0] + xy_dist[1] * xy_dist[1]);
+
+			if (dist < curr_max_dist)
+			{
+				curr_max_dist = dist;
+				min_dist_idx = i;
+			}
+		}
+		
+		tmp_new_array[min_dist_idx].x = -9999;
+		tmp_new_array[min_dist_idx].y = -9999;
+
+		for(int i = 0; i < MAX_WPOINTS; i++)
+		{
+			if(tmp_new_array[i].x > -9999)
+			{
+				array[j].x = tmp_new_array[i].x;
+				array[j].y = tmp_new_array[i].y;
+				j++;
+			}
+		}
+	
+		for(int i = j; i < MAX_WPOINTS; i++)
+		{
+			array[i].x = -9999;
+			array[i].y = -9999;
+		}
+		
+		printf("Point %d deleted\n", min_dist_idx);
+		
 		*num = n - 1;
 	}
 }
 
-int waypoints_filled(WPoint *array, int size)
-{
-	for(int i = 0; i < size; i++)
-	{
-		if(array[i].x == -9999 || array[i].y == -9999)
-			return 0;
-	}
-	
-	return 1;
-}
+
+// int waypoints_filled(WPoint *array, int size)
+// {
+// 	for(int i = 0; i < size; i++)
+// 	{
+// 		if(array[i].x == -9999 || array[i].y == -9999)
+// 			return 0;
+// 	}
+// 	
+// 	return 1;
+// }
 
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
 {
@@ -197,8 +237,10 @@ fixed old_yaw = itofix(-old[2] * 180 / M_PI);
 int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
 int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
 fixed yaw = itofix(-new[2] * 180 / M_PI);
+
 	rotate_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2, old_yaw);
 	rotate_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2, yaw);	
+	
 }
 
 void draw_pose(BITMAP* bmp, double* old, double* new)
@@ -250,31 +292,43 @@ int y;
 int blk = makecol(0, 0, 0);
 int red = makecol(255, 0, 0);
 
-	if (size < 0) return;
-	if (size >= MAX_WPOINTS) return;
-	
 	// Draw black on old waypoints
-	for(int i = 0; i < 5; i++)
+	for(int i = 0; i < MAX_WPOINTS; i++)
 	{
-		x = ENV_OFFSET_X + ENV_SCALE * old_wpoints[i].x;
-		y = ENV_OFFSET_Y - ENV_SCALE * old_wpoints[i].y;
-		
-		circlefill(bmp, x, y, 5, blk);
+		if (old_wpoints[i].x <=-9999) continue;
+		circlefill(bmp, old_wpoints[i].x, old_wpoints[i].y, 4, blk);
 	}
 
 	// Draw new waypoints
-	x = ENV_OFFSET_X + ENV_SCALE * wpoints[0].x;
-	y = ENV_OFFSET_Y - ENV_SCALE * wpoints[0].y;
+// 	x = ENV_OFFSET_X + ENV_SCALE * wpoints[0].x;
+// 	y = ENV_OFFSET_Y - ENV_SCALE * wpoints[0].y;
 	
-	circlefill(bmp, x, y, 5, makecol(0, 255, 255));
+	if (size < 0) return;
+	if (size >= MAX_WPOINTS) return;
+	
+	for(int i = 0; i < MAX_WPOINTS; i++)
+	{
+		if (i==0 && wpoints[i].x > -9999)
+			circlefill(bmp,wpoints[i].x, wpoints[i].y, 4, makecol(0, 255, 255));
+		else if(i > 0 &&  wpoints[i].x > -9999)
+			circlefill(bmp, wpoints[i].x, wpoints[i].y, 4, red);
+		
+	}
+	
+/*	
+	x = wpoints[0].x;
+	y = wpoints[0].y;
+	
+	circlefill();
 	
 	for(int i = 1; i < size + 1; i++)
 	{
-		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
-		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;
-		
-		circlefill(bmp, x, y, 5, red);
-	}
+// 		x = ENV_OFFSET_X + ENV_SCALE * wpoints[i].x;
+// 		y = ENV_OFFSET_Y - ENV_SCALE * wpoints[i].y;
+		x = wpoints[i].x;
+		y = wpoints[i].y;	
+		circlefill(bmp, x, y, 4, red);
+	}*/
 	
 }
 
