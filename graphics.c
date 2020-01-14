@@ -185,18 +185,6 @@ WPoint tmp_new_array[MAX_WPOINTS];
 	}
 }
 
-
-// int waypoints_filled(WPoint *array, int size)
-// {
-// 	for(int i = 0; i < size; i++)
-// 	{
-// 		if(array[i].x == -9999 || array[i].y == -9999)
-// 			return 0;
-// 	}
-// 	
-// 	return 1;
-// }
-
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
 {
 	int red =  makecol(255, 0, 0);
@@ -222,8 +210,6 @@ void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + new[i].x);
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
 		//temp.z = pose[5] + new[i].z;
-		
-		//printf("print %d, x: %d, y: %d xd: %f yd: %f \n", i, (int)temp.x,(int)temp.y, new[i].x,new[i].y);
 		if(getpixel(bmp, (int)temp.x, (int)temp.y) < 0) continue;
 		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, red);
 	}
