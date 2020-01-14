@@ -21,12 +21,13 @@
 #define TP_GFX 33
 #define TP_PLOTS 125
 #define TP_LSR 20
-#define TP_MODEL 10
+#define TP_MODEL 15
 #define TP_LQR 50
 #define TP_KEY 100
 #define TP_POINT 300
+#define TP_GAINS 20
 
-#define THREAD_MAX_NUM 7
+#define THREAD_MAX_NUM 8
 /* --- Project functions --- */
 
 struct task_par {

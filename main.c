@@ -28,12 +28,20 @@ int gfx_initialized = 0;
 int key_initialized = 0;
 int gfx_enabled = 0;
 int key_enabled = 0;
+int key_mode = 0;
 int waypoints_num = -1;
+
+int QR_changed = 0;
+double Q_coeff = 1;
+double R_coeff = 1;
+
+double Q_coeff_old = 1;
+double R_coeff_old = 1;
 
 int tp_changed = 0;
 int selected_thread = 99;
 int sel_thread_old_tp = 0;
-int thread_periods[7] = {0};
+int thread_periods[THREAD_MAX_NUM] = {0};
 
 int start_sim = 0;
 int end_sim = 0;
@@ -66,6 +74,7 @@ void* gfx_task (void* arg);
 void* plt_task (void* arg);
 void* laser_task (void* arg);
 void* point_task (void* arg);
+void* gains_task (void* arg);
 
 /* main thread */
 
@@ -73,16 +82,16 @@ int main (int argc, char **argv)
 {
 
 struct sched_param sched_mod, sched_gfx, sched_lqr, sched_pnt;
-struct sched_param sched_plt, sched_key, sched_lsr;
+struct sched_param sched_plt, sched_key, sched_lsr, sched_gains;
 
 struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt;
-struct task_par tp_key, tp_lsr, tp_pnt;
+struct task_par tp_key, tp_lsr, tp_pnt, tp_gains;
 
 pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt;
-pthread_attr_t attr_key, attr_lsr, attr_pnt;
+pthread_attr_t attr_key, attr_lsr, attr_pnt, attr_gains;
 
 pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt; 
-pthread_t tid_key, tid_lsr, tid_pnt;
+pthread_t tid_key, tid_lsr, tid_pnt, tid_gains;
 
 int ret = 0;
 
@@ -132,7 +141,13 @@ int ret = 0;
 	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
 	thread_periods[6] = TP_PLOTS;
 
+	//Create Gains Computation Thread
+	set_task_params(&tp_gains, 8, TP_GAINS, TP_GAINS, 10);
+	ret = thread_create (&tp_gains, &sched_gains, attr_gains, &tid_gains, gains_task);
+	thread_periods[7] = TP_GAINS;
+	
 	pthread_join (tid_pnt, NULL);
+	pthread_join (tid_gains, NULL);
 	pthread_join (tid_plt, NULL);
 	pthread_join (tid_lsr, NULL);
 	pthread_join (tid_lqr, NULL);
@@ -401,7 +416,8 @@ double rep_force_ampli = 0.0;
  		//printf("---\n");
  		
 		pthread_mutex_lock(&mux_gfx);
-		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
+		draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
+		//draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
 		
 		if (deadline_miss (tp))
@@ -687,14 +703,39 @@ struct task_par* tp;
 	
 	printf("Waypoints selection completed: found %d goals\n", waypoints_num);
 	
-// 	for(int i = 0; i< MAX_WPOINTS; i++)
-// 		printf("Points %d: (%.1f, %.1f)\n",i, waypoints[i].x, waypoints[i].y);
-// 	
-	
 	usleep(1e6);
 
 	pthread_exit(0);
 
+}
+
+/*
+ * Task
+ * -----------------
+ * Used for solve the ARE to get the gains
+ * of the LQR controller
+ */
+void* gains_task(void* arg)
+{
+struct task_par* tp;
+
+	tp = (struct task_par *)arg;
+	set_period (tp);
+	
+	do
+	{
+		
+
+		if (deadline_miss(tp))		
+			printf ("DEADLINE MISS: gains_task()\n");
+
+		wait_for_period (tp);	
+		eval_period(tp, thread_periods, &selected_thread, 7, &tp_changed);
+	
+	}while(0);
+	
+	pthread_exit(0);
+	
 }
 
 
@@ -706,11 +747,9 @@ struct task_par* tp;
  */
 void* key_task(void* arg)
 {
-    
-	struct task_par* tp;
+struct task_par* tp;
 
 	tp = (struct task_par *)arg;
-
 	set_period (tp);
 
 	key_enabled = 1;
@@ -730,55 +769,139 @@ void* key_task(void* arg)
 		if(key[KEY_SPACE])
 		{
 			start_sim = 1;
+			key_mode = 0;
 		}
 		
 		if(key[KEY_ENTER])
-		if (selected_thread < 99) tp_changed = 1;
-
-		if(key[KEY_0])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 0);
+			if (key_mode == 1)
+			{
+				if (selected_thread < 99) 
+					tp_changed = 1;
+			}
+			else if (key_mode >= 2)
+			{	
+				printf("Q coeff: %lf - R coeff: %lf\n", Q_coeff, R_coeff);
+				QR_changed = 1;
+			}
+			key_mode = 0;
+		}
+		
+		
+		if(key[KEY_0])
+		{	
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 0);
 		}
 		if(key[KEY_1])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 1);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 1);
 		}
 		if(key[KEY_2])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 2);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 2);
 		}
 		if(key[KEY_3])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 3);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 3);
 		}
 		if(key[KEY_4])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 4);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 4);
 		}
 		
 		if(key[KEY_5])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 5);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 5);
 		}
 			
 		if(key[KEY_6])
 		{
-			 select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 6);
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 6);
+		}
+
+		if(key[KEY_7])
+		{
+			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 7);
+		}
+		
+		if(key[KEY_Q])
+		{
+			if(key_mode != 2)
+			{
+				printf("Select the new gain for the Q weights matrix\n");
+				key_mode = 2;
+				Q_coeff_old = Q_coeff;
+			}
+		}
+
+		if(key[KEY_R])
+		{
+			if(key_mode != 3)
+			{
+				printf("Select the new gain for the R weights matrix\n");
+				key_mode = 3;
+				R_coeff_old = R_coeff;
+			}
 		}
 
 		if(key[KEY_BACKSPACE])
 		{
-			cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
-		}
+			if (key_mode == 1)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+			}
+			else if (key_mode == 2)
+			{
+				Q_coeff = Q_coeff_old;
+				printf("Q coeff reverted to: %lf\n", Q_coeff);
+			}
+			else if (key_mode == 3)
+			{
+				R_coeff = R_coeff_old;
+				printf("R coeff reverted to: %lf\n", R_coeff);
+			}
 			
+			key_mode = 0;
+		}
+
 		if(key[KEY_UP])
 		{
-			modify_thread_tp(&selected_thread, thread_periods, 10);
+			if(key_mode == 1)
+				modify_thread_tp(&selected_thread, thread_periods, 10);
+			else if(key_mode == 2)
+			{
+				Q_coeff *= 10;
+				printf("Q coeff: %f\n", Q_coeff);
+			}
+			else if(key_mode == 3)
+			{
+				R_coeff *= 10;
+				printf("R coeff: %f\n", R_coeff);
+			}
 		}
 		
 		if(key[KEY_DOWN])
 		{
-			modify_thread_tp(&selected_thread, thread_periods, -10);
+			if(key_mode == 1)
+				modify_thread_tp(&selected_thread, thread_periods, -10);
+			else if(key_mode == 2)
+			{
+				Q_coeff /= 10;
+				printf("Q coeff: %f\n", Q_coeff);
+			}
+			else if(key_mode == 3)
+			{
+				R_coeff /= 10;
+				printf("R coeff: %f\n", R_coeff);
+			}
 		}
 		
 		// Check left mouse click
@@ -801,7 +924,6 @@ void* key_task(void* arg)
 		printf ("DEADLINE MISS: key_task()\n");
 
 		wait_for_period (tp);
-		
 		eval_period(tp, thread_periods, &selected_thread, 1, &tp_changed);
 
 	}while(!end_sim);

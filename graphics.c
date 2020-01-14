@@ -230,6 +230,32 @@ void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 
 }
 
+void draw_laser_points(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
+{
+int red =  makecol(255, 0, 0);
+int blk = makecol(0,0,0);
+Trace temp = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
+Trace temp_old = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
+
+	for(int i = 0; i < N_BEAMS; i++)
+	{
+		temp_old.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3] + old[i].x);
+		temp_old.y = ENV_OFFSET_Y - ENV_SCALE * (old_pose[4] + old[i].y);
+		//temp_old.z = old_pose[5] + old[i].z;
+		
+		putpixel(bmp, (int)temp_old.x, (int)temp_old.y, blk);
+
+		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + new[i].x);
+		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
+		//temp.z = pose[5] + new[i].z;
+		
+		//printf("print %d, x: %d, y: %d xd: %f yd: %f \n", i, (int)temp.x,(int)temp.y, new[i].x,new[i].y);
+		putpixel(bmp, (int)temp.x, (int)temp.y, red);
+	}
+	//printf("---\n");
+	
+}
+
 void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new)
 {
 
