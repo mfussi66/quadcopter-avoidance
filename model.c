@@ -138,7 +138,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 	int i = 0;
 	int obj_found;
 	double yaw = pose[2];
-	Trace temp;
+	Trace temp = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
 	
 	for (int a = angle - 90; a <= spread - 90; a += angle)
 	{
