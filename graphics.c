@@ -328,10 +328,10 @@ int red = makecol(255, 0, 0);
 	
 }
 
-void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, int scale)
 {
 	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
-	int y = coord_y - (int)(data[0] * PLT_SCALE_Y) - PLT_FRAME_SIZE / 2;
+	int y = coord_y - (int)(data[0] * scale) - PLT_FRAME_SIZE / 2;
 	int x_prev = x;
 	int y_prev = y;
 	
@@ -339,7 +339,7 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y)
 	{
 		x = x + PLT_STEP;
 
-		y = coord_y - (int)(data[i] * PLT_SCALE_Y) - PLT_FRAME_SIZE / 2;
+		y = coord_y - (int)(data[i] * scale) - PLT_FRAME_SIZE / 2;
 		
 		if (y < (coord_y - PLT_FRAME_SIZE))
 			y = (coord_y - PLT_FRAME_SIZE);

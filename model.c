@@ -38,10 +38,13 @@ double compute_pos_dist(Vector* v1, Vector* v2)
  * ---------------------------
  * 
  */
-void compute_setpoint(Vector* sp, WPoint* wp, double alt, int wp_size, int* wp_flags)
+void compute_setpoint(Vector* sp, WPoint* wp, double alt, Vector* pose, int wp_size, int* wp_flags)
 {
 	
 WPoint xy_setpoint;
+double yaw_ref = 0.0;
+double x = gsl_vector_get(pose, 3);
+double y = gsl_vector_get(pose, 4);
 
 	if (wp_size >= MAX_WPOINTS) return;
 	
@@ -54,12 +57,14 @@ WPoint xy_setpoint;
 			break;
 		}	
 	}
+
+	yaw_ref = atan2(xy_setpoint.y - y, xy_setpoint.x - x);
 	
+	gsl_vector_set(sp, 2, yaw_ref);
 	gsl_vector_set(sp, 3, xy_setpoint.x);
 	gsl_vector_set(sp, 4, xy_setpoint.y);
 	gsl_vector_set(sp, 5, alt);
 	
-	//TODO compute reference yaw
 	
 }
 

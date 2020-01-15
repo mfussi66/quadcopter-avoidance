@@ -20,7 +20,7 @@ typedef gsl_matrix Matrix;
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
-void compute_setpoint(Vector* sp, WPoint* wp, double alt, int wp_size, int* wp_flags);
+void compute_setpoint(Vector* sp, WPoint* wp, double alt, Vector* pose, int wp_size, int* wp_flags);
 
 void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
 

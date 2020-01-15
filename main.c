@@ -301,8 +301,12 @@ double dist = 0.0;
     
 	if(start_sim)
 	{
-		printf("LQR Controller task started\n");	
-		compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
+		printf("LQR Controller task started\n");
+		
+		pthread_mutex_lock (&mux_state);
+		state_view = gsl_vector_view_array(arr_state, SIZE_X);
+		compute_setpoint(setpoint, waypoints, altitude_sp, &state_view.vector, waypoints_num, waypoint_flags);
+		pthread_mutex_unlock (&mux_state);
 	}
 	
 	do{
@@ -317,7 +321,7 @@ double dist = 0.0;
 			printf("Waypoint %d reached\n", waypoint_idx);
 			waypoint_flags[waypoint_idx] = 1;
 			waypoint_idx++;
-			compute_setpoint(setpoint, waypoints, altitude_sp, waypoints_num, waypoint_flags);
+			compute_setpoint(setpoint, waypoints, altitude_sp, &state_view.vector, waypoints_num, waypoint_flags);
 		}
 		
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
@@ -416,8 +420,8 @@ double rep_force_ampli = 0.0;
  		//printf("---\n");
  		
 		pthread_mutex_lock(&mux_gfx);
-		draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
-		//draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
+		//draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
+		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
 		
 		if (deadline_miss (tp))
@@ -622,13 +626,13 @@ double new_pose[SIZE_Y] = {0.0};
 		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
 		
-		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD);		
-		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD);
-		update_plot(buffer_gfx, plt_buf_Yaw, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD);
+		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD, 25);		
+		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD, 25);
+		update_plot(buffer_gfx, plt_buf_Yaw, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD, 10);
 		
-		update_plot(buffer_gfx, plt_buf_X, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD);		
-		update_plot(buffer_gfx, plt_buf_Y, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD);
-		update_plot(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD);
+		update_plot(buffer_gfx, plt_buf_X, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, PLT_SCALE_Y);		
+		update_plot(buffer_gfx, plt_buf_Y, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, PLT_SCALE_Y);
+		update_plot(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, PLT_SCALE_Y);
 		
 		pthread_mutex_unlock(&mux_gfx);
 
