@@ -410,8 +410,8 @@ double rep_force_ampli = 0.0;
 		pthread_mutex_lock(&mux_rep_forces);
 		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
 		
-		rep_forces[0] = 0.000 * rep_forces_xyz[1]; //tau_roll
-		rep_forces[1] = 0.000 * rep_forces_xyz[0]; //tau_pitch
+		rep_forces[0] = 0.0004 * rep_forces_xyz[1]; //tau_roll
+		rep_forces[1] = 0.0000 * rep_forces_xyz[0]; //tau_pitch
 		
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_rep_forces);
@@ -493,7 +493,7 @@ BITMAP* expl;
 	show_mouse(buffer_gfx);
 	
 	do{
-
+		scare_mouse();
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
 		
 		pthread_mutex_lock(&mux_points);
@@ -503,11 +503,10 @@ BITMAP* expl;
 		pthread_mutex_unlock(&mux_points);
 
 		pthread_mutex_lock(&mux_gfx);		
-		scare_mouse();
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-		unscare_mouse();
+
 		pthread_mutex_unlock(&mux_gfx);
-		
+		unscare_mouse();		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: gfx_task()\n");
 

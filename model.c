@@ -171,7 +171,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
 			tr[i].z = temp.z;
 // 			if (obj_found)
-// 				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
+				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
 			i++;
 		}
 	}
@@ -209,7 +209,10 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
 	rep_force_body[2] = force_sum.z;
 	
-	//printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
+	tr_ampli = sqrt(rep_force_body[0] * rep_force_body[0] + rep_force_body[1] * rep_force_body[1]);
+	
+	printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
+	printf("\n----\n");
 }
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs)
