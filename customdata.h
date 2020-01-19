@@ -21,9 +21,9 @@
 
 #define OFFSET_LASER 0
 #define N_BEAMS 5
-#define BEAM_DMIN 1
+#define BEAM_DMIN 3
 #define BEAM_DMAX 10
-#define BEAM_DSTEP 1
+#define BEAM_DSTEP 0.01
 
 #define COL_GREEN 48
 
@@ -62,6 +62,12 @@ typedef struct
 	double y;
 } WPoint;
 
+typedef struct
+{
+	int start;
+	int end;
+} Valley;
+
 typedef struct servo_par {
 	int mid;				/* motor id */
 	float x_sp;			/* angular position set point */
@@ -96,6 +102,8 @@ typedef struct vect6d {
 	linear linear;
 	angular angular;
 } vect6d;
+
+
 
 typedef struct status {
 	vect6d pose;

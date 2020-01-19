@@ -59,12 +59,27 @@ double y = gsl_vector_get(pose, 4);
 	}
 
 	yaw_ref = atan2(xy_setpoint.y - y, xy_setpoint.x - x);
-	
 	gsl_vector_set(sp, 2, yaw_ref);
 	gsl_vector_set(sp, 3, xy_setpoint.x);
 	gsl_vector_set(sp, 4, xy_setpoint.y);
 	gsl_vector_set(sp, 5, alt);
+}
+
+
+double compute_yaw_ref(double yaw, WPoint* sp, double yaw_laser, double gain)
+{
 	
+double yaw_ref;
+double a_r;
+
+	a_r = atan2(sp->y, sp->y) - yaw;
+
+	yaw_ref = a_r + gain * (yaw_laser);
+	
+	printf("yaw: %f rel:%f d:%f \n---\n", rad2deg(a_r), rad2deg(yaw_laser), rad2deg(yaw_ref));
+		
+	
+	return yaw_ref;
 	
 }
 
@@ -139,43 +154,35 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n)
 {
 	int angle = spread / (n);
-	int col = makecol(0, 255, 0);
 	int i = 0;
-	int obj_found;
+	float d = BEAM_DMIN;
 	double yaw = pose[2];
-	Trace temp = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
+	Trace trace_mt = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
+	Trace trace_px = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
 	
 	for (int a = angle - 90; a <= spread - 90; a += angle)
-	{
-		obj_found = 0;
-		
-		for(int d = BEAM_DMIN; d <= BEAM_DMAX; d += BEAM_DSTEP)
-		{	
-			temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + d * cos(deg2rad(a) + yaw));
-			temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + d * sin(deg2rad(a) + yaw));
-			temp.z = pose[5] - 0 * sin(deg2rad(a));
-			
-			//printf("d: %d, a: %d x: %f, y: %f \n", d, a, temp.x,temp.y);
-			//printf("dist x: %lf y: %lf \n", d * cos(deg2rad(a)), d * sin(deg2rad(a)));
-			
-			if (getpixel(bmp, (int)temp.x, (int)temp.y) ==  COL_GREEN)
-			{
-				//printf("Beam %d found: x: %f y: %f \n", i, temp.x, temp.y);
-				break;
-			}
-		}
-		//printf("beam %d, a: %d x: %f, y: %f \n", i, a, temp.x,temp.y);
-		if (i < n)
+	{	
+		d = BEAM_DMIN;
+		while(d <= BEAM_DMAX)
 		{
-			tr[i].x = (temp.x - ENV_OFFSET_X - OFFSET_LASER) / ENV_SCALE - pose[3];
-			tr[i].y = (temp.y - ENV_OFFSET_Y) / (- ENV_SCALE) - pose[4];
-			tr[i].z = temp.z;
-// 			if (obj_found)
-				printf("Beam %d: xd: %.1f yd: %.1f \n", i, tr[i].x, tr[i].y);
-			i++;
-		}
-	}
+			trace_mt.x = d * cos(deg2rad((double)a) + yaw);
+			trace_mt.y = d * sin(deg2rad((double)a) + yaw);
 
+			trace_px.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + trace_mt.x);
+			trace_px.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + trace_mt.y);
+
+			tr[i].x = trace_mt.x;
+			tr[i].y = trace_mt.y;
+
+			if (getpixel(bmp, (int)trace_px.x, (int)trace_px.y) == makecol(0, 255, 0))
+				break;
+
+			d += BEAM_DSTEP;
+		}
+		//printf("%d a: %f (%.2lf, %.2lf)\n", i,rad2deg(atan2(tr[i].y, tr[i].x)), trace_px.x, trace_px.y);
+		if(i < n) i++;
+	}
+	//printf("----\n");
 }
 
 void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_body)
@@ -196,7 +203,7 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	{
 		//printf("%d: (x:%.2f, y:%.2f)\n",i, tr[i].x, tr[i].y);
 		tr_angle = atan2(tr[i].y, tr[i].x);
-		//printf("   tr_angle %f\n", rad2deg(tr_angle));
+		//printf("    tr_angle %f\n", rad2deg(tr_angle));
 		force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
 		force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
 		force_sum.z += 0.0;
@@ -204,15 +211,132 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	
 	tr_ampli = sqrt(force_sum.x * force_sum.x + force_sum.y * force_sum.y);
 	tr_angle = atan2(force_sum.y, force_sum.x);
+	
+	if (tr_ampli >= 6)
+	{
+		rep_force_body[0] = force_sum.x * cos(yaw) - force_sum.y * sin(yaw);
+		rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
+		rep_force_body[2] = force_sum.z;
+		
+		tr_ampli = sqrt(rep_force_body[0] * rep_force_body[0] + rep_force_body[1] * rep_force_body[1]);
+		
+		rep_force_body[0] = rep_force_body[0] / tr_ampli; 
+		rep_force_body[1] = rep_force_body[1] / tr_ampli; 
+	}
+	else
+	{
+		rep_force_body[0] = 0.0;
+		rep_force_body[1] = 0.0;
+		rep_force_body[2] = 0.0;
+	}	
+	
+	
+	tr_angle = atan2(rep_force_body[1], rep_force_body[0]);
+	printf("(x:%.2f, y:%.2f) a: %f\n" ,rep_force_body[0], rep_force_body[1], rad2deg(tr_angle));
 
-	rep_force_body[0] = force_sum.x * cos(yaw) - force_sum.y * sin(yaw);
-	rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
-	rep_force_body[2] = force_sum.z;
+}
+
+
+void compute_histogram(Trace* tr, int n, double* hist)
+{
+double tr_angle = 0.0;
+
+	for(int i = 0; i < n; i++)
+	{
+		tr_angle = atan2(tr[i].y, tr[i].x);
+		
+		hist[i] = sqrt(pow2(BEAM_DMAX * cos(tr_angle) - tr[i].x) + 
+					   pow2(BEAM_DMAX * sin(tr_angle) - tr[i].y));
+		//printf("%d: (%f, %f) %f\n", i,tr[i].x,tr[i].y, hist[i]);
+	}
+}
+
+void find_valleys(double* hist, Valley* valleys, int size, int* v_size, int threshold)
+{
 	
-	tr_ampli = sqrt(rep_force_body[0] * rep_force_body[0] + rep_force_body[1] * rep_force_body[1]);
+int start_found = 0;
+int j = 0;
+
+	for(int i = 0; i < size; i++)
+	{
+		valleys[i].start = 0;
+		valleys[i].end = size - 1;
+	}
+
+	for(int i = 0; i < size; i++)
+	{
+		if (hist[i] < threshold && start_found == 0)
+		{
+			valleys[j].start = i;
+			start_found = 1;
+		}
+		else if(hist[i] >= threshold && start_found == 1)
+		{
+			valleys[j].end = i;
+			start_found = 0;
+			j++;
+		}
+	}
 	
-	printf("(am:%.2f, an:%.2f)\n", tr_ampli, rad2deg(atan2(rep_force_body[1], rep_force_body[0])));
-	printf("\n----\n");
+// 	for(int j = 0; j < size; j++)
+// 	{
+// 		printf("v: %d (%d, %d)\n", j, valleys[j].start, valleys[j].end);
+// 	}
+
+	
+	*v_size = j;
+}
+
+double compute_heading(Trace* tr, Valley* v, int v_size, double* pose, WPoint* sp)
+{
+int j = 0;
+double dist[2];
+double a_start;
+int i_start;
+double a_end;
+int i_end;
+int i_nearest = 0;
+int i_nearest_tmp = 0;
+double a_nearest = M_PI;
+double a_nearest_tmp = M_PI;
+double theta_rel = 0.0;
+
+	dist[0]= sp->x - pose[3];
+	dist[1]= sp->y - pose[4];
+
+	for(int i = 0; i < v_size; i++)
+	{
+		i_start = v[i].start;
+		a_start = atan2(tr[j].y - dist[1], tr[j].x - dist[0]);
+		
+		i_end = v[i].end;
+		a_end = atan2(tr[j].y - dist[1], tr[j].x - dist[0]);
+		
+		if(fabs(a_end) > fabs(a_start))
+		{
+			i_nearest = i_end;
+			a_nearest_tmp = a_end;
+		}
+		else
+		{
+			i_nearest = i_start;
+			a_nearest_tmp = a_start;
+		}
+		
+		if(a_nearest_tmp <= a_nearest)
+		{
+			i_nearest = i_nearest_tmp;
+			a_nearest = a_nearest_tmp;
+		}
+	}
+	
+	i_start = v[i_nearest].start;
+	i_end = v[i_nearest].end;
+	
+	theta_rel = (atan2(tr[i_start].y, tr[i_start].x) + atan2(tr[i_end].y, tr[i_end].x)) / 2;
+	
+	return theta_rel;
+	
 }
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs)
@@ -259,4 +383,9 @@ double deg2rad(double n)
 double rad2deg(double n)
 {
 	return n * 180 / M_PI;	
+}
+
+double pow2(double n)
+{
+	return n * n;
 }

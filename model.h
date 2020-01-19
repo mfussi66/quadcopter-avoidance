@@ -24,6 +24,8 @@ void compute_setpoint(Vector* sp, WPoint* wp, double alt, Vector* pose, int wp_s
 
 void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
 
+double compute_yaw_ref(double yaw, WPoint* sp, double yaw_laser, double gain);
+
 void compute_error(Vector *setpoint, Vector *state, Vector *result);
 
 double compute_pos_dist(Vector* v1, Vector* v2);
@@ -32,6 +34,12 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n);
 
+void compute_histogram(Trace* tr, int n, double* hist);
+
+void find_valleys(double* hist, Valley* valleys, int size, int* v_size, int threshold);
+
+double compute_heading(Trace* tr, Valley* v, int v_size, double* pose, WPoint* sp);
+
 void compute_repulsive_force(Trace* tr, int n, double* pose, double* rep_force);
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs);
@@ -39,5 +47,8 @@ int chk_collisions(double* pose, Obstacle* obs, int n_obs);
 double rad2deg(double n);
 
 double deg2rad(double n);
+
+double pow2(double n);
+
 
 #endif

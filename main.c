@@ -315,7 +315,6 @@ double dist = 0.0;
 		state_view = gsl_vector_view_array(arr_state, SIZE_X);
 
 		dist = compute_pos_dist(setpoint, &state_view.vector);
-
 		if(dist <= 0.3 && waypoint_idx < waypoints_num)
 		{
 			printf("Waypoint %d reached\n", waypoint_idx);
@@ -331,8 +330,8 @@ double dist = 0.0;
 		pthread_mutex_lock (&mux_forces);
 		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
 		
-// 		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
-// 			   arr_forces[0], arr_forces[1], arr_forces[2], arr_forces[3]);
+		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
+			   arr_state[9], arr_state[10], arr_state[11], arr_forces[3]);
 		
 		pthread_mutex_unlock (&mux_forces);
 		
@@ -410,14 +409,14 @@ double rep_force_ampli = 0.0;
 		pthread_mutex_lock(&mux_rep_forces);
 		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
 		
-		rep_forces[0] = 0.0004 * rep_forces_xyz[1]; //tau_roll
-		rep_forces[1] = 0.0000 * rep_forces_xyz[0]; //tau_pitch
+		rep_forces[0] = 0.008 * rep_forces_xyz[1]; //tau_roll
+		rep_forces[1] = 0.0005 * rep_forces_xyz[0]; //tau_pitch
 		
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_rep_forces);
 
-  		//printf("rep force (x:%.2f, y:%.2f)\n", rep_forces_xyz[0], rep_forces_xyz[1]);
- 		//printf("---\n");
+  		printf("rep force (x:%f, y:%f)\n", rep_forces[0], rep_forces[1]);
+ 		printf("---\n");
  		
 		pthread_mutex_lock(&mux_gfx);
 		//draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
