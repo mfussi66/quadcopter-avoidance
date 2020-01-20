@@ -330,9 +330,9 @@ double dist = 0.0;
 		pthread_mutex_lock (&mux_forces);
 		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
 		
-		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
-			   arr_state[9], arr_state[10], arr_state[11], arr_forces[3]);
-		
+// 		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
+// 			   arr_state[9], arr_state[10], arr_state[11], arr_forces[3]);
+// 		
 		pthread_mutex_unlock (&mux_forces);
 		
 		if (deadline_miss (tp))
@@ -409,14 +409,14 @@ double rep_force_ampli = 0.0;
 		pthread_mutex_lock(&mux_rep_forces);
 		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
 		
-		rep_forces[0] = 0.008 * rep_forces_xyz[1]; //tau_roll
+		rep_forces[0] = 0.004 * rep_forces_xyz[1]; //tau_roll
 		rep_forces[1] = 0.0005 * rep_forces_xyz[0]; //tau_pitch
 		
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_rep_forces);
-
+/*
   		printf("rep force (x:%f, y:%f)\n", rep_forces[0], rep_forces[1]);
- 		printf("---\n");
+ 		printf("---\n");*/
  		
 		pthread_mutex_lock(&mux_gfx);
 		//draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
@@ -501,6 +501,8 @@ BITMAP* expl;
 		draw_waypoints(buffer_gfx, old_waypoints, curr_waypoints, waypoints_num);
 		pthread_mutex_unlock(&mux_points);
 
+		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
+		
 		pthread_mutex_lock(&mux_gfx);		
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
 
@@ -527,6 +529,8 @@ BITMAP* expl;
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
 		
 		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
+		
+		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
 		
 		if (collision)
 			draw_quad(buffer_gfx, expl, quad_bg, old_pose, curr_pose);
@@ -616,6 +620,7 @@ double new_pose[SIZE_Y] = {0.0};
 		shift_and_append(plt_buf_Yaw, PLT_DATA_SIZE, new_pose[2]);
     
 		pthread_mutex_lock(&mux_gfx);
+				
 		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, makecol(0,0,0));
@@ -773,13 +778,21 @@ struct task_par* tp;
 			start_sim = 1;
 			key_mode = 0;
 		}
-		
+
 		if(key[KEY_ENTER])
 		{
 			if (key_mode == 1)
 			{
-				if (selected_thread < 99) 
+				if (selected_thread < 99 && thread_periods[selected_thread] != sel_thread_old_tp)
+				{
 					tp_changed = 1;
+				}
+				else if(selected_thread < 99 && 
+					thread_periods[selected_thread] == sel_thread_old_tp)
+				{
+					cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+					tp_changed = 0;
+				}
 			}
 			else if (key_mode >= 2)
 			{	

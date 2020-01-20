@@ -99,7 +99,16 @@ void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u)
  	gsl_vector_sub(e, x);
 
 	gsl_blas_dgemv(CblasNoTrans, 1, K, e, 0, u);
-
+	
+// 	if(gsl_vector_get(u, 1) > 0.05)
+// 		gsl_vector_set(u, 1, 0.05);
+// 	else if(gsl_vector_get(u, 1) < -0.05)
+// 		gsl_vector_set(u, 1, -0.05);
+// 	
+// 	if(gsl_vector_get(u, 2) > 0.05)
+// 		gsl_vector_set(u, 2, 0.05);
+// 	else if(gsl_vector_get(u, 2) < -0.05)
+// 		gsl_vector_set(u, 2, -0.05);
 }
 
 /* 
@@ -201,24 +210,26 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	
 	for(int i = 0; i < n; i++)
 	{
-		//printf("%d: (x:%.2f, y:%.2f)\n",i, tr[i].x, tr[i].y);
-		tr_angle = atan2(tr[i].y, tr[i].x);
-		//printf("    tr_angle %f\n", rad2deg(tr_angle));
-		force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
-		force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
-		force_sum.z += 0.0;
+		
+		if(sqrt(pow2(tr[i].x) + pow2(tr[i].y)) < 1)
+		{
+			tr_angle = atan2(tr[i].y, tr[i].x);
+			force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
+			force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
+			force_sum.z += 0.0;
+		}
 	}
 	
 	tr_ampli = sqrt(force_sum.x * force_sum.x + force_sum.y * force_sum.y);
 	tr_angle = atan2(force_sum.y, force_sum.x);
 	
-	if (tr_ampli >= 6)
+	if (tr_ampli > 0)
 	{
 		rep_force_body[0] = force_sum.x * cos(yaw) - force_sum.y * sin(yaw);
 		rep_force_body[1] = force_sum.y * sin(yaw) + force_sum.y * cos(yaw);
 		rep_force_body[2] = force_sum.z;
 		
-		tr_ampli = sqrt(rep_force_body[0] * rep_force_body[0] + rep_force_body[1] * rep_force_body[1]);
+		tr_ampli = sqrt(pow2(rep_force_body[0]) + pow2(rep_force_body[1]));
 		
 		rep_force_body[0] = rep_force_body[0] / tr_ampli; 
 		rep_force_body[1] = rep_force_body[1] / tr_ampli; 
@@ -232,7 +243,7 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 	
 	
 	tr_angle = atan2(rep_force_body[1], rep_force_body[0]);
-	printf("(x:%.2f, y:%.2f) a: %f\n" ,rep_force_body[0], rep_force_body[1], rad2deg(tr_angle));
+	//printf("(x:%.2f, y:%.2f) a: %f\n" ,rep_force_body[0], rep_force_body[1], rad2deg(tr_angle));
 
 }
 
@@ -277,12 +288,6 @@ int j = 0;
 			j++;
 		}
 	}
-	
-// 	for(int j = 0; j < size; j++)
-// 	{
-// 		printf("v: %d (%d, %d)\n", j, valleys[j].start, valleys[j].end);
-// 	}
-
 	
 	*v_size = j;
 }

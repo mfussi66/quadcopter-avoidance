@@ -63,14 +63,15 @@ int time_cmp(struct timespec t1, struct timespec t2)
 
 void eval_period(struct task_par *tp, int* arr_tp, int* sel_t, int t_idx, int *change_flag)
 {
-	if(!*change_flag)
-		return;
+	if(!*change_flag) return;
 	
-	if(*sel_t != t_idx)
-		return;
+	if(*sel_t != t_idx) return;
 	
 	if(arr_tp[t_idx] == tp->period)
+	{
+		*change_flag = 0;
 		return;
+	}
 	
 	struct timespec t;
 	

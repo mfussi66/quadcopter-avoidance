@@ -53,6 +53,18 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	textout_centre_ex(bmp, font, "X", 690, 335, col, -1);
 	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
 	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);
+	
+	textout_ex(bmp,font, "PERIODS", 575, 8, col, -1);
+	textout_ex(bmp,font, "Select with number", 575, 20, col, -1);
+	textout_ex(bmp,font, "Change with Up/Down arrows", 575, 30, col, -1);
+	textout_ex(bmp,font, "0 - Graphics", 575, 45, col, -1);
+	textout_ex(bmp,font, "1 - KeyBoard", 575, 55, col, -1);
+	textout_ex(bmp,font, "2 - Waypoints", 575, 65, col, -1);
+	textout_ex(bmp,font, "3 - Model", 575, 75, col, -1);
+	textout_ex(bmp,font, "4 - Control", 575, 85, col, -1);
+	textout_ex(bmp,font, "5 - Laser Scan", 575, 95, col, -1);
+	textout_ex(bmp,font, "6 - Plots", 575, 105, col, -1);
+	textout_ex(bmp,font, "7 - LQR iter", 575, 115, col, -1);
 
 }
 
@@ -297,6 +309,24 @@ void draw_pose(BITMAP* bmp, double* old, double* new)
     triangle(bmp, tr1_1_x,tr1_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
     triangle(bmp, tr2_1_x,tr2_1_y,tr1_2_x,tr1_2_y,tr1_3_x,tr1_3_y, COL_GREEN);
     
+}
+
+void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
+{
+	char text[4];
+	
+	rectfill(bmp, 745, 40, 795, 125, makecol(0, 0, 0));
+	
+	for(int i = 0; i < size; i++)
+	{
+		sprintf(text, "%d", tp[i]);
+		
+		if (i == sel)
+			textout_ex(bmp,font, text, 750, 45 + 10 * i, makecol(255, 0, 255), -1);
+		else
+			textout_ex(bmp,font, text, 750, 45 + 10 * i, COL_GREEN, -1);
+	}
+	
 }
 
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)

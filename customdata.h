@@ -14,15 +14,15 @@
 
 #define ENV_OFFSET_X 20
 #define ENV_OFFSET_Y 575
-#define ENV_SCALE 10
+#define ENV_SCALE 50
 
 #define MAX_WPOINTS 5
 #define OBS_NUM 2
 
 #define OFFSET_LASER 0
-#define N_BEAMS 5
-#define BEAM_DMIN 3
-#define BEAM_DMAX 10
+#define N_BEAMS 9
+#define BEAM_DMIN 1
+#define BEAM_DMAX 5
 #define BEAM_DSTEP 0.01
 
 #define COL_GREEN 48

@@ -30,6 +30,8 @@ void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new);
 
 void draw_pose(BITMAP* bmp, double* old, double* new);
 
+void draw_periods(BITMAP* bmp, int* tp, int size, int sel);
+
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose);
 
 void draw_laser_points(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose);
