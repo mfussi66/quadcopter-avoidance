@@ -24,7 +24,7 @@ int gen_obstacles(Obstacle* arr_obstacles, int n_obs);
 
 void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col);
  
-void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, int scale);
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double scale);
 
 void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new);
 
@@ -41,5 +41,9 @@ void add_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
 void del_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
 
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size);
+
+void draw_gains(BITMAP* bmp, double* p, double* d, int sel);
+
+void draw_msg(BITMAP* bmp, int mode);
 
 #endif

@@ -11,7 +11,7 @@ void start_allegro (void)
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_AUTODETECT_WINDOWED, 800, 600, 0, 0);
+	set_gfx_mode (GFX_AUTODETECT_FULLSCREEN, 1366, 768, 0, 0);
     install_keyboard();
 	install_mouse();
 	
@@ -54,18 +54,29 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
 	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);
 	
-	textout_ex(bmp,font, "PERIODS", 575, 8, col, -1);
-	textout_ex(bmp,font, "Select with number", 575, 20, col, -1);
-	textout_ex(bmp,font, "Change with Up/Down arrows", 575, 30, col, -1);
-	textout_ex(bmp,font, "0 - Graphics", 575, 45, col, -1);
-	textout_ex(bmp,font, "1 - KeyBoard", 575, 55, col, -1);
-	textout_ex(bmp,font, "2 - Waypoints", 575, 65, col, -1);
-	textout_ex(bmp,font, "3 - Model", 575, 75, col, -1);
-	textout_ex(bmp,font, "4 - Control", 575, 85, col, -1);
-	textout_ex(bmp,font, "5 - Laser Scan", 575, 95, col, -1);
-	textout_ex(bmp,font, "6 - Plots", 575, 105, col, -1);
-	textout_ex(bmp,font, "7 - LQR iter", 575, 115, col, -1);
-
+	textout_ex(bmp,font, "Select with number/letter", 575, 10, col, -1);
+	textout_ex(bmp,font, "Change with Up/Down arrows", 575, 20, col, -1);
+	textout_ex(bmp,font, "PERIODS", 575, 35, col, -1);
+	textout_ex(bmp,font, "[0] Graphics", 575, 45, col, -1);
+	textout_ex(bmp,font, "[1] KeyBoard", 575, 55, col, -1);
+	textout_ex(bmp,font, "[2] Waypoints", 575, 65, col, -1);
+	textout_ex(bmp,font, "[3] Model", 575, 75, col, -1);
+	textout_ex(bmp,font, "[4] Control", 575, 85, col, -1);
+	textout_ex(bmp,font, "[5] Laser Scan", 575, 95, col, -1);
+	textout_ex(bmp,font, "[6] Plots", 575, 105, col, -1);
+	textout_ex(bmp,font, "[7] LQR iter", 575, 115, col, -1);
+	textout_ex(bmp,font, "[ENTER] confirm period", 575, 125, col, -1);
+	textout_ex(bmp,font, "[BACKSPACE] cancel period", 575, 135, col, -1);
+	
+	textout_ex(bmp,font, "GAINS", 575, 153, col, -1);
+	textout_ex(bmp,font, "Kp      Kd", 680, 153, col, -1);
+	textout_ex(bmp,font, "[X] Xpos", 575, 165, col, -1);
+	textout_ex(bmp,font, "[Y] Ypos", 575, 175, col, -1);
+	textout_ex(bmp,font, "[Z] Altitude", 575, 185, col, -1);
+	textout_ex(bmp,font, "[R] Roll", 575, 195, col, -1);
+	textout_ex(bmp,font, "[P] Pitch", 575, 205, col, -1);
+	textout_ex(bmp,font, "[W] Yaw", 575, 215, col, -1);
+	textout_ex(bmp,font, "[C] Reset gains to default", 575, 225, col, -1);	
 }
 
 void draw_exit_screen(BITMAP* bmp, int col)
@@ -322,7 +333,7 @@ void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 		sprintf(text, "%d", tp[i]);
 		
 		if (i == sel)
-			textout_ex(bmp,font, text, 750, 45 + 10 * i, makecol(255, 0, 255), -1);
+			textout_ex(bmp,font, text, 750, 45 + 10 * i, makecol(255, 165, 0), -1);
 		else
 			textout_ex(bmp,font, text, 750, 45 + 10 * i, COL_GREEN, -1);
 	}
@@ -332,8 +343,6 @@ void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)
 {
 
-int x;
-int y;
 int blk = makecol(0, 0, 0);
 int red = makecol(255, 0, 0);
 
@@ -358,10 +367,11 @@ int red = makecol(255, 0, 0);
 	
 }
 
-void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, int scale)
+void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double scale)
 {
 	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
-	int y = coord_y - (int)(data[0] * scale) - PLT_FRAME_SIZE / 2;
+	int y = coord_y - (data[0] * scale) - PLT_FRAME_SIZE / 2;
+		
 	int x_prev = x;
 	int y_prev = y;
 	
@@ -369,17 +379,50 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, int scale)
 	{
 		x = x + PLT_STEP;
 
-		y = coord_y - (int)(data[i] * scale) - PLT_FRAME_SIZE / 2;
+		y = coord_y - (data[i] * scale) - PLT_FRAME_SIZE / 2;
 		
-		if (y < (coord_y - PLT_FRAME_SIZE))
+		if (y <= (coord_y - PLT_FRAME_SIZE))
 			y = (coord_y - PLT_FRAME_SIZE);
 		
-		if (y > coord_y)
+		if (y >= coord_y)
 			y = coord_y;
 		
+		if(getpixel(bmp, x_prev, y_prev) < 0) continue;
+		if(getpixel(bmp, x, y) < 0) continue;
 		fastline(bmp, x_prev, y_prev, x, y, COL_GREEN);
-
+		
 		x_prev = x;
 		y_prev = y;
 	}
+}
+
+void draw_gains(BITMAP* bmp, double* p, double* d, int sel)
+{
+char text[20];
+	
+	rectfill(bmp, 672, 164, 795, 216, makecol(0, 0, 0));
+	
+	for(int i = 0; i < 6; i++)
+	{
+		sprintf(text, "%.1e %.1e", p[i], d[i]);
+		
+		if (i == sel - 2)
+			textout_ex(bmp,font, text, 673, 165 + 10 * i, makecol(255, 165, 0), -1);
+		else
+			textout_ex(bmp,font, text, 673, 165 + 10 * i, COL_GREEN, -1);
+	}
+}
+
+void draw_msg(BITMAP* bmp, int mode)
+{
+	if (mode == 0) return;
+	
+	switch(mode)
+		case 1:
+		{
+			textout_centre_ex(bmp, font, "!!! Collision detected !!!", 400, 300,
+							  makecol(0,0,0), makecol(255,0,0));
+			textout_centre_ex(bmp, font, "Press [ESC] to exit simulation", 400, 309,
+							  makecol(0,0,0), makecol(255,0,0));
+		}
 }

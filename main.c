@@ -14,6 +14,11 @@ double arr_repulsive_forces[2] = {0.0};
 double arr_error[SIZE_X] = {0.0};
 double setpoint_rpy[2] = {0.0};
 
+double prop_gains[6] = {0.0};
+double deriv_gains[6] = {0.0};
+double prop_gains_df[6] = {0.0};
+double deriv_gains_df[6] = {0.0};
+
 Trace arr_traces[N_BEAMS];
 Trace arr_old_traces[N_BEAMS];
 
@@ -66,6 +71,7 @@ pthread_mutex_t mux_gfx;
 pthread_mutex_t mux_points;
 pthread_mutex_t mux_laser;
 pthread_mutex_t mux_rpy_sp;
+pthread_mutex_t mux_gains;
 
 pthread_mutexattr_t muxattr;
 
@@ -106,6 +112,7 @@ int ret = 0;
 	mutex_create (mux_gfx, muxattr, 0, 100);
 	mutex_create (mux_laser, muxattr, 0, 100);
 	mutex_create (mux_rpy_sp, muxattr, 0, 100);
+	mutex_create (mux_gains, muxattr, 0, 100);
 	
 	pthread_mutexattr_destroy (&muxattr);
 	
@@ -200,6 +207,8 @@ double total_forces[SIZE_U] = {0.0};
 	
 	set_period (tp);
 	
+	init_gains(prop_gains, deriv_gains, prop_gains_df, deriv_gains_df);
+	
 	do{
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: model_task()\n");
@@ -234,26 +243,29 @@ double total_forces[SIZE_U] = {0.0};
 		
 		dist = compute_pos_dist(setpoint_xy, xy);
 
-		pthread_mutex_lock(&mux_rpy_sp);	
+		pthread_mutex_lock(&mux_rpy_sp);
 		
-		if(dist <= 0.1 && waypoint_idx < waypoints_num)
+		setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+		
+		if(dist <= 0.1 && waypoint_idx >= waypoints_num)
+		{
+			printf("Waypoint %d reached\n", waypoint_idx);
+			setpoint_rpy[2] = state[2];
+		}
+		else if(dist <= 0.1 && waypoint_idx < waypoints_num)
 		{
 			printf("Waypoint %d reached\n", waypoint_idx);
 			waypoint_flags[waypoint_idx] = 1;
 			waypoint_idx++;
 			compute_setpoint(setpoint_xy, waypoints, state, altitude_sp, waypoints_num, waypoint_flags);
-			setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+			setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
 			wp_selected = 1;
 			target.x = setpoint_xy[0];
 			target.y = setpoint_xy[1];
 			yawref = setpoint_rpy[2];
 		}
-		
-		//setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
-		
-		setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
-		
-		printf("yaw ref: %f \n", setpoint_rpy[2]);
+	
+		//printf("yaw ref: %f \n", setpoint_rpy[2]);
 		
 		//setpoint_rpy[2] = yawref;
 		pthread_mutex_unlock(&mux_rpy_sp);
@@ -267,10 +279,11 @@ double total_forces[SIZE_U] = {0.0};
 		
 		rotate_error(error_xy, rpy[2]);
 		
-		pid_xy_control(error_xy, error_xy_old, setpoint_rpy, 0.0);
+		pthread_mutex_lock(&mux_gains);
+		pid_xy_control(error_xy, error_xy_old, setpoint_rpy, prop_gains, deriv_gains);
 		compute_error(setpoint_rpy, rpy, error_rpy, error_rpy_old, 3);
-		pid_rpy_alt_control(error_rpy, error_rpy_old, forces);
-		
+		pid_rpy_alt_control(error_rpy, error_rpy_old, forces, prop_gains, deriv_gains);
+		pthread_mutex_unlock(&mux_gains);
 // 		printf("forces: %lf, %lf\n", forces[0] * 1e7, forces[1] * 1e7);
 // 		printf("rep-forces: %lf, %lf\n---\n", rep_forces[0] * 1e7, rep_forces[1] * 1e7);	
 // 		
@@ -287,6 +300,10 @@ double total_forces[SIZE_U] = {0.0};
 
 		pthread_mutex_unlock(&mux_rpy_sp);	
         
+		pthread_mutex_lock(&mux_forces);
+		memcpy(arr_forces, forces, sizeof(double) * SIZE_U);
+		pthread_mutex_unlock(&mux_forces);
+		
 		collision = chk_collisions(arr_state, arr_obstacles, OBS_NUM);
 		if (collision ==1) 
 			printf("Collision detected!!\n");
@@ -477,6 +494,7 @@ BITMAP* expl;
 		pthread_mutex_unlock(&mux_points);
 
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
+		draw_gains(buffer_gfx, prop_gains, deriv_gains, key_mode);
 		
 		pthread_mutex_lock(&mux_gfx);		
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
@@ -505,9 +523,13 @@ BITMAP* expl;
 		
 		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
+		draw_gains(buffer_gfx, prop_gains, deriv_gains, key_mode);
 		
 		if (collision)
+		{
 			draw_quad(buffer_gfx, expl, quad_bg, old_pose, curr_pose);
+			draw_msg(buffer_gfx, 1);
+		}
 		else if (quad != NULL)
 			draw_quad(buffer_gfx, quad, quad_bg, old_pose, curr_pose);
 		else
@@ -558,8 +580,13 @@ double plt_buf_Yaw[PLT_DATA_SIZE] = {0.0};
 double plt_buf_X[PLT_DATA_SIZE] = {0.0};
 double plt_buf_Y[PLT_DATA_SIZE] = {0.0};
 double plt_buf_Z[PLT_DATA_SIZE] = {0.0};
+double plt_buf_tauX[PLT_DATA_SIZE] = {0.0};
+double plt_buf_tauY[PLT_DATA_SIZE] = {0.0};
+double plt_buf_tauZ[PLT_DATA_SIZE] = {0.0};
+
 
 double new_pose[SIZE_Y] = {0.0};
+double new_forces[SIZE_U] = {0.0};
 
 	tp = (struct task_par *)arg;
 	
@@ -582,16 +609,19 @@ double new_pose[SIZE_Y] = {0.0};
 		pthread_mutex_lock(&mux_state);
         
 		memcpy(new_pose, arr_state, sizeof(double) * SIZE_Y);
-	
 		pthread_mutex_unlock(&mux_state);
+		
+		pthread_mutex_lock(&mux_forces);
+		memcpy(new_forces, arr_forces, sizeof(double) * SIZE_Y);
+		pthread_mutex_unlock(&mux_forces);
         
-		shift_and_append(plt_buf_X, PLT_DATA_SIZE, new_pose[3]);
-		shift_and_append(plt_buf_Z, PLT_DATA_SIZE, new_pose[5]);
-		shift_and_append(plt_buf_Y, PLT_DATA_SIZE, new_pose[4]);
+		shift_and_append(plt_buf_tauX, PLT_DATA_SIZE, new_forces[0]);
+		shift_and_append(plt_buf_tauY, PLT_DATA_SIZE, new_forces[1]);
+		shift_and_append(plt_buf_tauZ, PLT_DATA_SIZE, new_forces[2]);
 		
 		shift_and_append(plt_buf_Roll, PLT_DATA_SIZE, new_pose[0]);
 		shift_and_append(plt_buf_Pitch, PLT_DATA_SIZE, new_pose[1]);
-		shift_and_append(plt_buf_Yaw, PLT_DATA_SIZE, new_pose[2]);
+		shift_and_append(plt_buf_Z, PLT_DATA_SIZE, new_pose[5]);
     
 		pthread_mutex_lock(&mux_gfx);
 				
@@ -603,13 +633,13 @@ double new_pose[SIZE_Y] = {0.0};
 		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
 		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
 		
-		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD, 25);		
-		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD, 25);
-		update_plot(buffer_gfx, plt_buf_Yaw, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD, 10);
+		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD, 5e7);
+		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD, 1e9);
+		update_plot(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD, 1);
 		
-		update_plot(buffer_gfx, plt_buf_X, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, PLT_SCALE_Y);		
-		update_plot(buffer_gfx, plt_buf_Y, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, PLT_SCALE_Y);
-		update_plot(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, PLT_SCALE_Y);
+		update_plot(buffer_gfx, plt_buf_tauX, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, 1e4);
+		update_plot(buffer_gfx, plt_buf_tauY, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, 1e4);
+		update_plot(buffer_gfx, plt_buf_tauZ, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, 5e3);
 		
 		pthread_mutex_unlock(&mux_gfx);
 
@@ -749,85 +779,112 @@ struct task_par* tp;
 		
 		if(key[KEY_0])
 		{	
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 0);
 		}
 		if(key[KEY_1])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 1);
 		}
 		if(key[KEY_2])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 2);
 		}
 		if(key[KEY_3])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 3);
 		}
 		if(key[KEY_4])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 4);
 		}
 		
 		if(key[KEY_5])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 5);
 		}
 			
 		if(key[KEY_6])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 6);
 		}
 
 		if(key[KEY_7])
 		{
-			if (key_mode != 1) {key_mode = 1; R_coeff = R_coeff_old; Q_coeff = Q_coeff_old;}
+			if (key_mode != 1) {key_mode = 1;}
 			select_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp, 7);
 		}
 		
-		if(key[KEY_Q])
+		if(key[KEY_X])
 		{
 			if(key_mode != 2)
 			{
-				printf("Select the new gain for the Q weights matrix\n");
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
 				key_mode = 2;
-				Q_coeff_old = Q_coeff;
+			}
+		}
+
+		if(key[KEY_Y])
+		{
+			if(key_mode != 3)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 3;
+			}
+		}
+		
+		if(key[KEY_Z])
+		{
+			if(key_mode != 4)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 4;
 			}
 		}
 
 		if(key[KEY_R])
 		{
-			if(key_mode != 3)
+			if(key_mode != 5)
 			{
-				printf("Select the new gain for the R weights matrix\n");
-				key_mode = 3;
-				R_coeff_old = R_coeff;
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 5;
+			}
+		}
+		
+		if(key[KEY_P])
+		{
+			if(key_mode != 6)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 6;
+			}
+		}
+		
+		if(key[KEY_W])
+		{
+			if(key_mode != 7)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 7;
 			}
 		}
 
+		if(key[KEY_C])
+		{
+			reset_gains(prop_gains, deriv_gains, prop_gains_df, deriv_gains_df);
+			key_mode = 0;
+		}
+		
 		if(key[KEY_BACKSPACE])
 		{
 			if (key_mode == 1)
-			{
 				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
-			}
-			else if (key_mode == 2)
-			{
-				Q_coeff = Q_coeff_old;
-				printf("Q coeff reverted to: %lf\n", Q_coeff);
-			}
-			else if (key_mode == 3)
-			{
-				R_coeff = R_coeff_old;
-				printf("R coeff reverted to: %lf\n", R_coeff);
-			}
-			
 			key_mode = 0;
 		}
 
@@ -835,15 +892,11 @@ struct task_par* tp;
 		{
 			if(key_mode == 1)
 				modify_thread_tp(&selected_thread, thread_periods, 10);
-			else if(key_mode == 2)
+			else if(key_mode > 1)
 			{
-				Q_coeff *= 10;
-				printf("Q coeff: %f\n", Q_coeff);
-			}
-			else if(key_mode == 3)
-			{
-				R_coeff *= 10;
-				printf("R coeff: %f\n", R_coeff);
+				pthread_mutex_lock(&mux_gains);
+				adjust_gain(prop_gains, deriv_gains, key_mode, 0);
+				pthread_mutex_unlock(&mux_gains);
 			}
 		}
 		
@@ -851,15 +904,11 @@ struct task_par* tp;
 		{
 			if(key_mode == 1)
 				modify_thread_tp(&selected_thread, thread_periods, -10);
-			else if(key_mode == 2)
+			else if(key_mode > 1)
 			{
-				Q_coeff /= 10;
-				printf("Q coeff: %f\n", Q_coeff);
-			}
-			else if(key_mode == 3)
-			{
-				R_coeff /= 10;
-				printf("R coeff: %f\n", R_coeff);
+				pthread_mutex_lock(&mux_gains);
+				adjust_gain(prop_gains, deriv_gains, key_mode, 1);
+				pthread_mutex_unlock(&mux_gains);
 			}
 		}
 		

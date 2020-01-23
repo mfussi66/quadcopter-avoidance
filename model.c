@@ -96,21 +96,26 @@ double a_r;
 	
 }
 
-void pid_xy_control(double* e, double* e_prev, double* rp_sp, double yaw)
+void pid_xy_control(double* e, double* e_prev, double* rp_sp, double* p, double* d)
 {
 		
 	// roll
-	rp_sp[0] = e[1] * 1e-6 + 3e-4 * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	rp_sp[0] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
 	// pitch
-	rp_sp[1] = e[0] * 1e-6  + 3e-4 * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
+	rp_sp[1] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
 
 }
 
-void pid_rpy_alt_control(double* e, double* e_prev, double* u)
+void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d)
 {
-	u[0] = e[0] * 0.001 + 0.001 * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
-	u[1] = e[1] * 0.001 + 0.001 * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
-	u[2] = e[2] * 0.0001 + 0.004 * (e[2] - e_prev[2]) / (TP_MODEL / 1000.0);
+	// tau roll
+	u[0] = e[0] * p[3] + d[3] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
+	// tau pitch
+	u[1] = e[1] * p[4] + d[4] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	// tau yaw
+	u[2] = e[2] * p[5] + d[5] * (e[2] - e_prev[2]) / (TP_MODEL / 1000.0);
+	
+	// vertical thrust
 	u[3] = 0.0;
 	
 //	printf("u0: %lf, u1: %lf\n", u[0], u[1] * 1e7);
@@ -191,10 +196,10 @@ void lin_model(double* u, double* x, double yaw_sp)
 	X_new[2] = X_old[2] + X_new[8] * (TP_MODEL / 1000.0);		// yaw
 	
 	X_new[9] = X_old[9] + 9.81 * X_new[1];						// u
-	X_new[3] =  X_new[9] * (TP_MODEL / 1000.0);		// x
+	X_new[3] =  X_new[9] * (TP_MODEL / 1000.0);					// x
 
 	X_new[10] = X_old[10] + 9.81 * X_new[0];					// v
-	X_new[4] =  X_new[10] * (TP_MODEL / 1000.0);		// y
+	X_new[4] =  X_new[10] * (TP_MODEL / 1000.0);				// y
 
 	X_new[11] = X_old[11] + u[3] / M;							// w
 	X_new[5] = X_old[5] + X_new[11] * (TP_MODEL / 1000.0);		// z
@@ -276,59 +281,49 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 
 void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_body)
 {
-	Trace force_sum;
+	Trace force_max;
 	double trace_min = 1;
 	double trace_tmp;
 	
-	force_sum.x = 0.0;
-	force_sum.y = 0.0;
-	force_sum.z = 0.0;
-	
-	double ampli_sum = 0.0;
-	double angle_sum = 0.0;
+	force_max.x = 0.0;
+	force_max.y = 0.0;
+	force_max.z = 0.0;
+
 	double yaw = pose[2];
 	double tr_ampli = 0.0;
 	double tr_angle = 0.0;
 	
 	for(int i = 0; i < n; i++)
 	{
-		
-// 		if(sqrt(pow2(tr[i].x) + pow2(tr[i].y)) < 1)
-// 		{
-// 			tr_angle = atan2(tr[i].y, tr[i].x);
-// 			force_sum.x += BEAM_DMAX * cos(tr_angle) - tr[i].x;
-// 			force_sum.y += BEAM_DMAX * sin(tr_angle) - tr[i].y;
-// 			force_sum.z += 0.0;
-// 		}
-			trace_tmp = sqrt(pow2(tr[i].x) + pow2(tr[i].y));
-			if(trace_tmp < trace_min)
-			{
-				trace_min = trace_tmp;
-				tr_angle = tr[i].theta;
-				force_sum.x = BEAM_DMAX * cos(tr_angle) - tr[i].x;
-				force_sum.y = BEAM_DMAX * sin(tr_angle) - tr[i].y;
-				force_sum.z = 0.0; 
-			}
+		trace_tmp = sqrt(pow2(tr[i].x) + pow2(tr[i].y));
+		if(trace_tmp < trace_min)
+		{
+			trace_min = trace_tmp;
+			tr_angle = tr[i].theta;
+			force_max.x = BEAM_DMAX * cos(tr_angle) - tr[i].x;
+			force_max.y = BEAM_DMAX * sin(tr_angle) - tr[i].y;
+			force_max.z = 0.0; 
+		}
 	}
 	
-	tr_ampli = sqrt(force_sum.x * force_sum.x + force_sum.y * force_sum.y);
-	tr_angle = atan2(force_sum.y, force_sum.x);
+	tr_ampli = sqrt(force_max.x * force_max.x + force_max.y * force_max.y);
+	tr_angle = atan2(force_max.y, force_max.x);
 	
 	if (tr_ampli > 0)
 	{
-		rep_force_body[0] = force_sum.x * cos(yaw) + force_sum.y * sin(yaw);
-		rep_force_body[1] = - force_sum.x * sin(yaw) + force_sum.y * cos(yaw);
-		rep_force_body[2] = force_sum.z;
+		rep_force_body[0] = force_max.x * cos(yaw) + force_max.y * sin(yaw);
+		rep_force_body[1] = - force_max.x * sin(yaw) + force_max.y * cos(yaw);
+		rep_force_body[2] = force_max.z;
 
-// 		rep_force_body[0] = force_sum.x;
-// 		rep_force_body[1] = force_sum.y;
-// 		rep_force_body[2] = force_sum.z;
+// 		rep_force_body[0] = force_max.x;
+// 		rep_force_body[1] = force_max.y;
+// 		rep_force_body[2] = force_max.z;
 
 		tr_ampli = sqrt(pow2(rep_force_body[0]) + pow2(rep_force_body[1]));
 		
 		rep_force_body[0] = rep_force_body[0] / tr_ampli; 
 		rep_force_body[1] = rep_force_body[1] / tr_ampli; 
-		printf("rfb_x: %f, rfb_y: %f\n",rep_force_body[0], rep_force_body[1]);
+		//printf("rfb_x: %f, rfb_y: %f\n",rep_force_body[0], rep_force_body[1]);
 	}
 	else
 	{
@@ -431,9 +426,9 @@ double theta_rel = 0.0;
 	i_start = v[i_nearest].start;
 	i_end = v[i_nearest].end;
 	
-	theta_rel = (atan2(tr[i_start].y, tr[i_start].x) + atan2(tr[i_end].y, tr[i_end].x)) / 2;
+	theta_rel = (atan2_safe(tr[i_start].y, tr[i_start].x) + atan2_safe(tr[i_end].y, tr[i_end].x)) / 2;
 	
-	printf("(%f, %f)\n", rad2deg(atan2(tr[i_start].y, tr[i_start].x)), rad2deg(atan2(tr[i_end].y, tr[i_end].x)));
+	printf("(%f, %f)\n", rad2deg(atan2_safe(tr[i_start].y, tr[i_start].x)), rad2deg(atan2_safe(tr[i_end].y, tr[i_end].x)));
 	printf("(%d, %d) %f\n", i_start, i_end, rad2deg(theta_rel));
 	printf("---\n");
 	
@@ -471,33 +466,51 @@ int chk_collisions(double* pose, Obstacle* obs, int n_obs)
 	return result;
 }
 
-
-/* 
- * Function: Utility functions for angle conversion
- * ---------------------------
- */
-double deg2rad(double n)
+void init_gains(double* p, double* d, double* p_df, double* d_df)
 {
-	return n * M_PI / 180;	
-}
-
-
-double rad2deg(double n)
-{
-	return n * 180 / M_PI;	
-}
-
-double pow2(double n)
-{
-	return n * n;
-}
-
-double atan2_safe(double y, double x)
-{
-double r = atan2(y, x);
-
-	if(r < 0) return (2 * M_PI + r);
+	// proportional gains
+	p[0] = 1e-6;	// x
+	p[1] = 1e-6;	// y
+	p[2] = 1e-4;	// z
+	p[3] = 1e-3;	// roll
+	p[4] = 1e-3;	// pitch
+	p[5] = 1e-4;	// yaw
 	
-	return r;
+	// derivative gains
+	d[0] = 3e-4;	// x
+	d[1] = 3e-4;	// y
+	d[2] = 1e-3;	// z
+	d[3] = 1e-3;	// roll
+	d[4] = 1e-3;	// pitch
+	d[5] = 4e-3;	// yaw
 	
+	memcpy(p_df, p, sizeof(double) * 6);
+	memcpy(d_df, d, sizeof(double) * 6);
+}
+
+void adjust_gain(double *p, double *d, int mode, int updown)
+{
+int idx = mode - 2;
+	
+	if(idx < 0) return;
+	
+	if(updown == 0)
+	{
+		p[idx] *= 2;
+		d[idx] *= 2;
+	}
+	else if(updown == 1)
+	{
+		p[idx] /= 2;
+		d[idx] /= 2;
+	}
+	
+	//printf("Adjusted %d p: %lf, d: %lf\n",idx,p[idx] * 1e6, d[idx] * 1e6);
+	
+}
+
+void reset_gains(double* p, double* d, double* p_df, double* d_df)
+{
+	memcpy(p, p_df, sizeof(double) * 6);
+	memcpy(d, d_df, sizeof(double) * 6);
 }

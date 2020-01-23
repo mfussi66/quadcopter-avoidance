@@ -26,9 +26,9 @@ void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
 void lin_model(double* u, double* x, double yaw_sp);
 
-void pid_rpy_alt_control(double* e, double* e_prev, double* u);
+void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d);
 
-void pid_xy_control(double* e, double* e_prev, double* rp_sp, double yaw);
+void pid_xy_control(double* e, double* e_prev, double* rp_sp, double* p, double* d);
 
 void rotate_error(double* e, double yaw);
 
@@ -58,12 +58,18 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double* rep_force);
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs);
 
-double rad2deg(double n);
+void init_gains(double* p, double* d, double* p_df, double* d_df);
 
-double deg2rad(double n);
+void adjust_gain(double* p, double* d, int mode, int updown);
 
-double pow2(double n);
+void reset_gains(double* p, double* d, double* p_df, double* d_df);
 
-double atan2_safe(double y, double x);
+// double rad2deg(double n);
+// 
+// double deg2rad(double n);
+// 
+// double pow2(double n);
+// 
+// double atan2_safe(double y, double x);
 
 #endif

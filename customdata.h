@@ -23,7 +23,7 @@
 #define N_BEAMS 9
 #define BEAM_DMIN 1
 #define BEAM_DMAX 5
-#define BEAM_DSTEP 0.01
+#define BEAM_DSTEP 0.005
 
 #define COL_GREEN 48
 
@@ -79,53 +79,34 @@ typedef struct
 	int end;
 } Valley;
 
-typedef struct servo_par {
-	int mid;				/* motor id */
-	float x_sp;			/* angular position set point */
-	float xdot_sp;			/* angular speed set point */
-	float x[3];			/* angular position array */
-	float xdot[3];			/* angular speed array */
-	float u[3];			         /* control action array */
-	float e[N_SAMPLES];			/* error array */
-	float integral;		     /* integral of error component */
-	float derivative;		/* derivative of error component */
-} servo_par;
-
-typedef struct angular_body {
-	float p;
-	float q;
-	float r;
-} angular_body;
-
-typedef struct angular {
-	float r;
-	float p;
-	float y;
-} angular;
-
-typedef struct linear {
-	float x;
-	float y;
-	float z;
-} linear;
-
-typedef struct vect6d {
-	linear linear;
-	angular angular;
-} vect6d;
+/* 
+ * Function: Utility functions for angle conversion
+ * ---------------------------
+ */
+double deg2rad(double n)
+{
+	return n * M_PI / 180;	
+}
 
 
+double rad2deg(double n)
+{
+	return n * 180 / M_PI;	
+}
 
-typedef struct status {
-	vect6d pose;
-	float traces[21];
-} status;
+double pow2(double n)
+{
+	return n * n;
+}
 
-typedef struct speeds {
-	float w1;				/* Rotational speed motor 1 */
-	float w2;				/* Rotational speed motor 2 */
-	float w3;				/* Rotational speed motor 3 */
-	float w4;				/* Rotational speed motor 4 */
-} speeds;
+double atan2_safe(double y, double x)
+{
+double r = atan2(y, x);
+
+	if(r < 0) return (2 * M_PI + r);
+	
+	return r;
+	
+}
 
 #endif /* CUSTOMDATA_H_INCLUDED */
