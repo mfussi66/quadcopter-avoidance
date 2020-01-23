@@ -491,3 +491,13 @@ double pow2(double n)
 {
 	return n * n;
 }
+
+double atan2_safe(double y, double x)
+{
+double r = atan2(y, x);
+
+	if(r < 0) return (2 * M_PI + r);
+	
+	return r;
+	
+}

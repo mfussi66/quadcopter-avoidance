@@ -64,5 +64,6 @@ double deg2rad(double n);
 
 double pow2(double n);
 
+double atan2_safe(double y, double x);
 
 #endif

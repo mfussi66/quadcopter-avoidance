@@ -249,7 +249,11 @@ double total_forces[SIZE_U] = {0.0};
 			yawref = setpoint_rpy[2];
 		}
 		
-		setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+		//setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+		
+		setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+		
+		printf("yaw ref: %f \n", setpoint_rpy[2]);
 		
 		//setpoint_rpy[2] = yawref;
 		pthread_mutex_unlock(&mux_rpy_sp);
