@@ -16,19 +16,33 @@
 typedef gsl_vector Vector;
 typedef gsl_matrix Matrix;
 
+#define Jxx 0.0099
+#define Jyy 0.0099
+#define Jzz 0.0189
+#define M 0.42
 /* Model */
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
-void compute_setpoint(Vector* sp, WPoint* wp, double alt, Vector* pose, int wp_size, int* wp_flags);
+void lin_model(double* u, double* x, double yaw_sp);
 
-void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u);
+void pid_rpy_alt_control(double* e, double* e_prev, double* u);
+
+void pid_xy_control(double* e, double* e_prev, double* rp_sp, double yaw);
+
+void rotate_error(double* e, double yaw);
+
+void pid_control(double* e, double* e_prev, double* u, double yaw);
+
+void compute_setpoint(double* sp, WPoint* wp, double* pose, double alt, int wp_size, int* wp_flags);
+
+void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u, double yaw);
 
 double compute_yaw_ref(double yaw, WPoint* sp, double yaw_laser, double gain);
 
-void compute_error(Vector *setpoint, Vector *state, Vector *result);
+void compute_error(double* sp, double* x, double* e, double* e_old, int size);
 
-double compute_pos_dist(Vector* v1, Vector* v2);
+double compute_pos_dist(double* v1, double* v2);
 
 void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose);
 

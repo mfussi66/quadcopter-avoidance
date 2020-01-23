@@ -10,18 +10,20 @@
 double arr_state[SIZE_X] = {0.0};
 double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
-double arr_repulsive_forces[SIZE_U] = {0.0};
+double arr_repulsive_forces[2] = {0.0};
 double arr_error[SIZE_X] = {0.0};
+double setpoint_rpy[2] = {0.0};
 
 Trace arr_traces[N_BEAMS];
 Trace arr_old_traces[N_BEAMS];
 
 WPoint waypoints[5] = {{-9999}, {-9999}};
-
+int wp_selected = 0;
 Obstacle arr_obstacles[OBS_NUM];
 
-double altitude_sp = 10.0;
+double altitude_sp = 0.0;
 float yawref = 0.0;
+WPoint target = {-9999, -9999};
 
 int collision = 0;
 int gfx_initialized = 0;
@@ -63,11 +65,13 @@ pthread_mutex_t mux_state;
 pthread_mutex_t mux_gfx;
 pthread_mutex_t mux_points;
 pthread_mutex_t mux_laser;
+pthread_mutex_t mux_rpy_sp;
 
 pthread_mutexattr_t muxattr;
 
 /* tasks  declaration */
-void* lqr_task (void* arg);
+void* pidrpy_task (void* arg);
+void* pidxy_task (void* arg);
 void* lin_model_task (void* arg);
 void* key_task (void* arg);
 void* gfx_task (void* arg);
@@ -81,16 +85,16 @@ void* gains_task (void* arg);
 int main (int argc, char **argv) 
 {
 
-struct sched_param sched_mod, sched_gfx, sched_lqr, sched_pnt;
+struct sched_param sched_mod, sched_gfx, sched_lqr, sched_pnt, sched_rpy;
 struct sched_param sched_plt, sched_key, sched_lsr, sched_gains;
 
-struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt;
+struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt, tp_rpy;
 struct task_par tp_key, tp_lsr, tp_pnt, tp_gains;
 
-pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt;
+pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt, attr_rpy;
 pthread_attr_t attr_key, attr_lsr, attr_pnt, attr_gains;
 
-pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt; 
+pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt, tid_rpy; 
 pthread_t tid_key, tid_lsr, tid_pnt, tid_gains;
 
 int ret = 0;
@@ -101,6 +105,7 @@ int ret = 0;
 	mutex_create (mux_points, muxattr, 0, 100);
 	mutex_create (mux_gfx, muxattr, 0, 100);
 	mutex_create (mux_laser, muxattr, 0, 100);
+	mutex_create (mux_rpy_sp, muxattr, 0, 100);
 	
 	pthread_mutexattr_destroy (&muxattr);
 	
@@ -126,35 +131,34 @@ int ret = 0;
 	ret = thread_create (&tp_mod, &sched_mod, attr_mod, &tid_mod, lin_model_task);
 	thread_periods[3] = TP_MODEL;
 
+	//Create RPY Thread
+	set_task_params(&tp_rpy, 4, TP_RPY, TP_RPY, 19);
+	//ret = thread_create (&tp_rpy, &sched_rpy, attr_rpy, &tid_rpy, pidrpy_task);
+	thread_periods[4] = TP_RPY;	
+	
 	//Create LQR Thread
-	set_task_params(&tp_lqr, 4, TP_LQR, TP_LQR, 19);
-	ret = thread_create (&tp_lqr, &sched_lqr, attr_lqr, &tid_lqr, lqr_task);
-	thread_periods[4] = TP_LQR;	
+	set_task_params(&tp_lqr, 5, TP_POS, TP_POS, 18);
+	//ret = thread_create (&tp_lqr, &sched_lqr, attr_lqr, &tid_lqr, pidxy_task);
+	thread_periods[5] = TP_POS;	
 
 	//Create Laser scan Thread
 	set_task_params(&tp_lsr, 6, TP_LSR, TP_LSR, 16);
 	ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
-	thread_periods[5] = TP_LSR;
+	thread_periods[6] = TP_LSR;
 
 	//Create Plotting Thread
-	set_task_params(&tp_plt, 5, TP_PLOTS, TP_PLOTS, 5);
+	set_task_params(&tp_plt, 7, TP_PLOTS, TP_PLOTS, 5);
 	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
-	thread_periods[6] = TP_PLOTS;
+	thread_periods[7] = TP_PLOTS;
 
-	//Create Gains Computation Thread
-	set_task_params(&tp_gains, 8, TP_GAINS, TP_GAINS, 10);
-	ret = thread_create (&tp_gains, &sched_gains, attr_gains, &tid_gains, gains_task);
-	thread_periods[7] = TP_GAINS;
 	
 	pthread_join (tid_pnt, NULL);
-	pthread_join (tid_gains, NULL);
-	pthread_join (tid_plt, NULL);
 	pthread_join (tid_lsr, NULL);
-	pthread_join (tid_lqr, NULL);
+	pthread_join (tid_plt, NULL);
 	pthread_join (tid_mod, NULL);
 	pthread_join (tid_key, NULL);
 	pthread_join (tid_gfx, NULL);
-
+ 
 	close_allegro();
 
 	pthread_mutex_destroy(&mux_points);
@@ -172,76 +176,120 @@ int ret = 0;
 void* lin_model_task(void* arg)
 {
 struct task_par* tp;
+gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
+gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
+double forces[SIZE_U] = {0.0};
+double state[SIZE_X] = {0.0};
+
+int waypoint_flags[MAX_WPOINTS] = {0};
+int waypoint_idx = 1;
+double dist = 0.0;
+
+double error_xy[3] = {0.0};
+double error_xy_old[3] = {0.0};
+double error_rpy[3] = {0.0};
+double error_rpy_old[3] = {0.0};
+double setpoint_rpy[3] = {0.0};
+double setpoint_xy[3] = {0.0};
+double xy[3] = {0.0};
+double rpy[3] = {0.0};
+double rep_forces[2] = {0.0};
+double total_forces[SIZE_U] = {0.0};
 
 	tp = (struct task_par *)arg;
+	
 	set_period (tp);
-
-	gsl_vector* lqr_forces = gsl_vector_calloc(SIZE_U);
-	gsl_vector* rep_forces = gsl_vector_calloc(SIZE_U);
-	gsl_vector* forces = gsl_vector_calloc(SIZE_U);
-	gsl_vector* state = gsl_vector_calloc(SIZE_X);
-	gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
-	gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
 	
 	do{
-
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: model_task()\n");
-		
+
 		wait_for_period (tp);
 		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
-        
-	}while(!start_sim  && !end_sim);
-	
+
+	}while(!start_sim && !end_sim);
+
 	if(start_sim)
 	{
-		// Set initial state from waypoints array	
-		gsl_vector_set(state, 3, (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE);
-		gsl_vector_set(state, 4, (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE);
-		gsl_vector_set(state, 5, 0);
-		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
-		
-		read_matrix_file("A.bin", A);
-		read_matrix_file("B.bin", B);
-		
+		// Set initial state from waypoints array
+		state[3] = (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE;
+		state[4] = (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE;
+		state[5] = 0;
+		compute_setpoint(setpoint_xy, waypoints, state, altitude_sp, waypoints_num, waypoint_flags);
+		setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+		target.x = setpoint_xy[0];
+		target.y = setpoint_xy[1];
+		yawref = setpoint_rpy[2];
+		memcpy(arr_state, state, sizeof(double) * SIZE_X);
 		printf("Dynamic model task started\n");
 	}
 	
     do{
+		rpy[0] = state[0];
+		rpy[1] = state[1];
+		rpy[2] = state[2];
+		xy[0] = state[3];
+		xy[1] = state[4];
+		xy[2] = state[5];
 		
-		// Lock forces to store in internal variable
-		pthread_mutex_lock (&mux_forces);
-		pthread_mutex_lock (&mux_rep_forces);
-	
-		memcpy(lqr_forces->data, arr_forces, sizeof(double) * SIZE_U);
-		memcpy(rep_forces->data, arr_repulsive_forces, sizeof(double) * SIZE_U);
+		dist = compute_pos_dist(setpoint_xy, xy);
+
+		pthread_mutex_lock(&mux_rpy_sp);	
 		
-// 		printf("a_f (%.2f, %.2f, %.2f)\n", arr_forces[0], arr_forces[1], arr_forces[2]);
-// 		printf("r_f (%.2f, %.2f, %.2f)\n", arr_repulsive_forces[0], arr_repulsive_forces[1], arr_repulsive_forces[2]);
-// 		printf("---\n");
+		if(dist <= 0.1 && waypoint_idx < waypoints_num)
+		{
+			printf("Waypoint %d reached\n", waypoint_idx);
+			waypoint_flags[waypoint_idx] = 1;
+			waypoint_idx++;
+			compute_setpoint(setpoint_xy, waypoints, state, altitude_sp, waypoints_num, waypoint_flags);
+			setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+			wp_selected = 1;
+			target.x = setpoint_xy[0];
+			target.y = setpoint_xy[1];
+			yawref = setpoint_rpy[2];
+		}
 		
-		gsl_vector_memcpy(forces, lqr_forces);
-		gsl_vector_add(forces, rep_forces);
+		setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
 		
-		pthread_mutex_unlock (&mux_forces);		
+		//setpoint_rpy[2] = yawref;
+		pthread_mutex_unlock(&mux_rpy_sp);
+		
+		pthread_mutex_lock(&mux_rep_forces);
+		memcpy(rep_forces, arr_repulsive_forces, sizeof(double) * 2);
 		pthread_mutex_unlock(&mux_rep_forces);
-        
-		// Lock state and compute new state from transition function
-        pthread_mutex_lock (&mux_state);
-        
-		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
+		//printf("yaw_r: %f yaw: %f \n", rad2deg(yawref), rad2deg(state[2]));
+
+		compute_error(setpoint_xy, xy, error_xy, error_xy_old, 3);
 		
-		quad_linear_model(forces, A, B, state);
+		rotate_error(error_xy, rpy[2]);
+		
+		pid_xy_control(error_xy, error_xy_old, setpoint_rpy, 0.0);
+		compute_error(setpoint_rpy, rpy, error_rpy, error_rpy_old, 3);
+		pid_rpy_alt_control(error_rpy, error_rpy_old, forces);
+		
+// 		printf("forces: %lf, %lf\n", forces[0] * 1e7, forces[1] * 1e7);
+// 		printf("rep-forces: %lf, %lf\n---\n", rep_forces[0] * 1e7, rep_forces[1] * 1e7);	
+// 		
+		total_forces[0] = forces[0] - rep_forces[0];
+		total_forces[1] = forces[1] - rep_forces[1];
+		total_forces[2] = forces[2];
+		total_forces[3] = forces[3];
+		
+		lin_model(total_forces, state, yawref);
+		
+		pthread_mutex_lock(&mux_state);
+		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
+		memcpy(arr_state, state, sizeof(double) * SIZE_X);
 
-		memcpy(arr_state, state->data, sizeof(double) * SIZE_X);
-
+		pthread_mutex_unlock(&mux_rpy_sp);	
+        
 		collision = chk_collisions(arr_state, arr_obstacles, OBS_NUM);
 		if (collision ==1) 
 			printf("Collision detected!!\n");
+
+			pthread_mutex_unlock(&mux_state);
 		
-		pthread_mutex_unlock (&mux_state);
-		
-		if (deadline_miss (tp))		
+		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: model_task()\n");
 		
 		wait_for_period (tp);
@@ -250,8 +298,6 @@ struct task_par* tp;
 	}while(!end_sim && collision == 0);
 	
 	// free memory allocated for GSL variables
-	gsl_vector_free(forces);
-	gsl_vector_free(state);
 	gsl_matrix_free(A);
 	gsl_matrix_free(B);
 
@@ -259,100 +305,6 @@ struct task_par* tp;
     
 	pthread_exit(0);
 
-}
-
-/*
- * Task
- * -----------------
- * Used for computing error and
- * control action
- */
-void* lqr_task(void* arg)
-{
-
-struct task_par* tp;
-
-gsl_vector* state = gsl_vector_calloc(SIZE_X);
-gsl_vector* forces = gsl_vector_calloc(SIZE_U);
-gsl_vector* setpoint = gsl_vector_calloc(SIZE_X);
-//gsl_vector* altitude_sp = gsl_vector_calloc(SIZE_X);
-gsl_vector* yaw_sp = gsl_vector_calloc(SIZE_X);
-gsl_matrix* K = gsl_matrix_calloc(SIZE_U, SIZE_X);
-gsl_vector_view state_view;
-
-int waypoint_flags[MAX_WPOINTS] = {0};
-int waypoint_idx = 1;
-double dist = 0.0;
-	
-	tp = (struct task_par *)arg;
-	
-	set_period (tp);
-
-	read_matrix_file("K.bin", K);
-	
-	do{
-		if (deadline_miss (tp))
-			printf ("DEADLINE MISS: lqr_task()\n");
-		
-		wait_for_period (tp);
-		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
-		
-	}while(!start_sim && !end_sim);
-    
-	if(start_sim)
-	{
-		printf("LQR Controller task started\n");
-		
-		pthread_mutex_lock (&mux_state);
-		state_view = gsl_vector_view_array(arr_state, SIZE_X);
-		compute_setpoint(setpoint, waypoints, altitude_sp, &state_view.vector, waypoints_num, waypoint_flags);
-		pthread_mutex_unlock (&mux_state);
-	}
-	
-	do{
-		
-		pthread_mutex_lock (&mux_state);
-		state_view = gsl_vector_view_array(arr_state, SIZE_X);
-
-		dist = compute_pos_dist(setpoint, &state_view.vector);
-		if(dist <= 0.3 && waypoint_idx < waypoints_num)
-		{
-			printf("Waypoint %d reached\n", waypoint_idx);
-			waypoint_flags[waypoint_idx] = 1;
-			waypoint_idx++;
-			compute_setpoint(setpoint, waypoints, altitude_sp, &state_view.vector, waypoints_num, waypoint_flags);
-		}
-		
-		state_view = gsl_vector_view_array(arr_state, SIZE_X);
-		dlqr_control(setpoint, &state_view.vector, K, forces);
-		pthread_mutex_unlock (&mux_state);
-		
-		pthread_mutex_lock (&mux_forces);
-		memcpy(arr_forces, forces->data, sizeof(double) * SIZE_U);
-		
-// 		printf("tau_r %f, tau_p %f, tau_y: %f, f_t %f\n", 
-// 			   arr_state[9], arr_state[10], arr_state[11], arr_forces[3]);
-// 		
-		pthread_mutex_unlock (&mux_forces);
-		
-		if (deadline_miss (tp))
-			printf ("DEADLINE MISS: lqr_task()\n");
-		
-		wait_for_period (tp);
-		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
-		
-	}while(!end_sim  && collision == 0);
-
-	// free memory allocated for GSL variables
-	gsl_vector_free(state);
-	gsl_vector_free(forces);
-	gsl_vector_free(setpoint);
-	gsl_matrix_free(K);
-    
-    printf("lqr task closed\n");
-    
-	pthread_exit(0);
-	
 }
 
 void* laser_task(void* arg)
@@ -370,6 +322,12 @@ double rep_forces_xyz[3] = {0.0};
 double rep_forces[SIZE_U] = {0.0};
 double rep_force_angle = 0.0;
 double rep_force_ampli = 0.0;
+
+double hist[N_BEAMS] = {0.0};
+Valley valleys[N_BEAMS];
+int valleys_num = 0;
+double res = 0.0;
+double new_yaw;
 	
 	tp = (struct task_par *)arg;
 	
@@ -406,12 +364,26 @@ double rep_force_ampli = 0.0;
 		get_laser_distances(buffer_gfx, laser_traces, pose, aperture, N_BEAMS);
 		pthread_mutex_unlock(&mux_gfx);
 
-		pthread_mutex_lock(&mux_rep_forces);
+		//pthread_mutex_lock(&mux_rep_forces);
+		
+// 		compute_histogram(laser_traces, N_BEAMS, hist);
+// 		find_valleys(hist, valleys, N_BEAMS, &valleys_num, 100);
+// 
+// 		pthread_mutex_lock(&mux_rpy_sp);
+// 		
+// 		res = compute_heading(laser_traces, valleys, valleys_num, pose, &target);
+// 		
+// 		yawref = res;
+// 		pthread_mutex_unlock(&mux_rpy_sp);
+
+// 		new_yaw = compute_yaw_ref(arr_state[2], &target, res, 1); 
+
 		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
 		
-		rep_forces[0] = 0.004 * rep_forces_xyz[1]; //tau_roll
-		rep_forces[1] = 0.0005 * rep_forces_xyz[0]; //tau_pitch
-		
+		rep_forces[0] = 4e-6 * rep_forces_xyz[1] + 2e-6 * arr_state[10]; //tau_roll
+		rep_forces[1] = 0 * rep_forces_xyz[0]  + 0 * arr_state[9]; //tau_pitch
+
+		pthread_mutex_unlock(&mux_rep_forces);
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
 		pthread_mutex_unlock(&mux_rep_forces);
 /*
@@ -419,7 +391,6 @@ double rep_force_ampli = 0.0;
  		printf("---\n");*/
  		
 		pthread_mutex_lock(&mux_gfx);
-		//draw_laser_points(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_pose, pose);
 		pthread_mutex_unlock(&mux_gfx);
 		
@@ -529,7 +500,6 @@ BITMAP* expl;
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
 		
 		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
-		
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
 		
 		if (collision)
@@ -715,36 +685,6 @@ struct task_par* tp;
 	pthread_exit(0);
 
 }
-
-/*
- * Task
- * -----------------
- * Used for solve the ARE to get the gains
- * of the LQR controller
- */
-void* gains_task(void* arg)
-{
-struct task_par* tp;
-
-	tp = (struct task_par *)arg;
-	set_period (tp);
-	
-	do
-	{
-		
-
-		if (deadline_miss(tp))		
-			printf ("DEADLINE MISS: gains_task()\n");
-
-		wait_for_period (tp);	
-		eval_period(tp, thread_periods, &selected_thread, 7, &tp_changed);
-	
-	}while(0);
-	
-	pthread_exit(0);
-	
-}
-
 
 /*
  * Task

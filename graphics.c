@@ -259,11 +259,11 @@ void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new)
 
 int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);
 int old_y = ENV_OFFSET_Y - (int) (ENV_SCALE * old[4]);
-fixed old_yaw = itofix(-old[2] * 180 / M_PI);
+fixed old_yaw = ftofix(old[2] / (2*M_PI)*256);
 
 int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
 int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
-fixed yaw = itofix(-new[2] * 180 / M_PI);
+fixed yaw = ftofix(new[2] / (2*M_PI)*256);
 
 	rotate_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2, old_yaw);
 	rotate_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2, yaw);	

@@ -39,6 +39,16 @@
 #define PLT_ZPOS_XCOORD 795
 #define PLT_ZPOS_YCOORD 595
 
+#define TP_GFX 33
+#define TP_PLOTS 125
+#define TP_LSR 30
+#define TP_MODEL 20
+#define TP_POS 10
+#define TP_RPY 10
+#define TP_KEY 100
+#define TP_POINT 80
+#define TP_GAINS 200
+
 /* --- Project Structures --- */
 
 typedef struct
@@ -46,6 +56,7 @@ typedef struct
 	double x;
 	double y;
 	double z;
+	double theta;
 } Trace;
 
 typedef struct
