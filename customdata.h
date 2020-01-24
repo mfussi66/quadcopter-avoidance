@@ -13,11 +13,11 @@
 #define SIZE_Y 6
 
 #define ENV_OFFSET_X 20
-#define ENV_OFFSET_Y 575
+#define ENV_OFFSET_Y 743
 #define ENV_SCALE 50
 
 #define MAX_WPOINTS 5
-#define OBS_NUM 2
+#define OBS_NUM 8
 
 #define OFFSET_LASER 0
 #define N_BEAMS 9
@@ -27,17 +27,26 @@
 
 #define COL_GREEN 48
 
+#define WIDTH_SCREEN 1366
+#define HEIGHT_SCREEN 768
+
 #define PLT_FRAME_SIZE 100
 #define PLT_DATA_SIZE 25
 #define PLT_SCALE_X PLT_DATA_SIZE
 #define PLT_STEP 4
 #define PLT_SCALE_Y 1
-#define PLT_XPOS_XCOORD 795
-#define PLT_XPOS_YCOORD 385
-#define PLT_YPOS_XCOORD 795
-#define PLT_YPOS_YCOORD 490
-#define PLT_ZPOS_XCOORD 795
-#define PLT_ZPOS_YCOORD 595
+#define PLT_12_XCOORD WIDTH_SCREEN - 5
+#define PLT_12_YCOORD HEIGHT_SCREEN - 215
+#define PLT_22_XCOORD WIDTH_SCREEN - 5
+#define PLT_22_YCOORD HEIGHT_SCREEN - 110
+#define PLT_32_XCOORD WIDTH_SCREEN - 5
+#define PLT_32_YCOORD HEIGHT_SCREEN - 5
+#define PLT_11_XCOORD WIDTH_SCREEN - 120
+#define PLT_11_YCOORD HEIGHT_SCREEN - 215
+#define PLT_21_XCOORD WIDTH_SCREEN - 120
+#define PLT_21_YCOORD HEIGHT_SCREEN - 110
+#define PLT_31_XCOORD WIDTH_SCREEN - 120
+#define PLT_31_YCOORD HEIGHT_SCREEN - 5
 
 #define TP_GFX 33
 #define TP_PLOTS 125
@@ -83,30 +92,5 @@ typedef struct
  * Function: Utility functions for angle conversion
  * ---------------------------
  */
-double deg2rad(double n)
-{
-	return n * M_PI / 180;	
-}
-
-
-double rad2deg(double n)
-{
-	return n * 180 / M_PI;	
-}
-
-double pow2(double n)
-{
-	return n * n;
-}
-
-double atan2_safe(double y, double x)
-{
-double r = atan2(y, x);
-
-	if(r < 0) return (2 * M_PI + r);
-	
-	return r;
-	
-}
 
 #endif /* CUSTOMDATA_H_INCLUDED */

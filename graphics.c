@@ -11,7 +11,7 @@ void start_allegro (void)
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_AUTODETECT_FULLSCREEN, 1366, 768, 0, 0);
+	set_gfx_mode (GFX_AUTODETECT_FULLSCREEN, WIDTH_SCREEN, HEIGHT_SCREEN, 0, 0);
     install_keyboard();
 	install_mouse();
 	
@@ -36,47 +36,48 @@ void close_allegro(void)
 void build_gui(BITMAP* bmp, FONT* font, int col)
 {
 	// Environment window
-	rect(bmp, 5, 5, 560, 595, col);
+	rect(bmp, 5, 5, 1100, HEIGHT_SCREEN - 5, col);
 
-	// Plots coordinates
-	rect(bmp, 695, 285, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, col);
-	rect(bmp, 695, 390, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, col);
-	rect(bmp, 695, 495, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, col);
-	rect(bmp, 580, 285, 680, 385, col);
-	rect(bmp, 580, 390, 680, 490, col);
-	rect(bmp, 580, 495, 680, 595, col);
+	// Rectangles that contains the plots
+	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 315, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 215, col);
+	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 210, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 110, col);
+	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 105, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 5, col);
+	rect(bmp, WIDTH_SCREEN - 220, HEIGHT_SCREEN - 315, WIDTH_SCREEN - 120, HEIGHT_SCREEN - 215, col);
+	rect(bmp, WIDTH_SCREEN - 220, HEIGHT_SCREEN - 210, WIDTH_SCREEN - 120, HEIGHT_SCREEN - 110, col);
+	rect(bmp, WIDTH_SCREEN - 220, HEIGHT_SCREEN - 105, WIDTH_SCREEN - 120, HEIGHT_SCREEN - 5, col);
 	
 	// Plots labels
-	textout_centre_ex(bmp, font, "R", 575, 335, col, -1);
-	textout_centre_ex(bmp, font, "P", 575, 440, col, -1);
-	textout_centre_ex(bmp, font, "Y", 575, 545, col, -1);
-	textout_centre_ex(bmp, font, "X", 690, 335, col, -1);
-	textout_centre_ex(bmp, font, "Y", 690, 440, col, -1);
-	textout_centre_ex(bmp, font, "Z", 690, 545, col, -1);
+	textout_centre_ex(bmp, font, "R", WIDTH_SCREEN - 110, PLT_12_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "P", WIDTH_SCREEN - 110, PLT_22_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Z", WIDTH_SCREEN - 110, PLT_32_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_X", WIDTH_SCREEN - 245, PLT_11_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_Y", WIDTH_SCREEN - 245, PLT_21_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_Z", WIDTH_SCREEN - 245, PLT_31_YCOORD - 50, col, -1);
 	
-	textout_ex(bmp,font, "Select with number/letter", 575, 10, col, -1);
-	textout_ex(bmp,font, "Change with Up/Down arrows", 575, 20, col, -1);
-	textout_ex(bmp,font, "PERIODS", 575, 35, col, -1);
-	textout_ex(bmp,font, "[0] Graphics", 575, 45, col, -1);
-	textout_ex(bmp,font, "[1] KeyBoard", 575, 55, col, -1);
-	textout_ex(bmp,font, "[2] Waypoints", 575, 65, col, -1);
-	textout_ex(bmp,font, "[3] Model", 575, 75, col, -1);
-	textout_ex(bmp,font, "[4] Control", 575, 85, col, -1);
-	textout_ex(bmp,font, "[5] Laser Scan", 575, 95, col, -1);
-	textout_ex(bmp,font, "[6] Plots", 575, 105, col, -1);
-	textout_ex(bmp,font, "[7] LQR iter", 575, 115, col, -1);
-	textout_ex(bmp,font, "[ENTER] confirm period", 575, 125, col, -1);
-	textout_ex(bmp,font, "[BACKSPACE] cancel period", 575, 135, col, -1);
+	// Editable data
+	textout_ex(bmp,font, "Select with number/letter", 1141, 10, col, -1);
+	textout_ex(bmp,font, "Change with Up/Down arrows", 1141, 20, col, -1);
+	textout_ex(bmp,font, "PERIODS", 1141, 35, col, -1);
+	textout_ex(bmp,font, "[0] Graphics", 1141, 45, col, -1);
+	textout_ex(bmp,font, "[1] KeyBoard", 1141, 55, col, -1);
+	textout_ex(bmp,font, "[2] Waypoints", 1141, 65, col, -1);
+	textout_ex(bmp,font, "[3] Model", 1141, 75, col, -1);
+	textout_ex(bmp,font, "[4] Control", 1141, 85, col, -1);
+	textout_ex(bmp,font, "[5] Laser Scan", 1141, 95, col, -1);
+	textout_ex(bmp,font, "[6] Plots", 1141, 105, col, -1);
+	textout_ex(bmp,font, "[7] LQR iter", 1141, 115, col, -1);
+	textout_ex(bmp,font, "[ENTER] confirm period", 1141, 125, col, -1);
+	textout_ex(bmp,font, "[BACKSPACE] cancel period", 1141, 135, col, -1);
 	
-	textout_ex(bmp,font, "GAINS", 575, 153, col, -1);
-	textout_ex(bmp,font, "Kp      Kd", 680, 153, col, -1);
-	textout_ex(bmp,font, "[X] Xpos", 575, 165, col, -1);
-	textout_ex(bmp,font, "[Y] Ypos", 575, 175, col, -1);
-	textout_ex(bmp,font, "[Z] Altitude", 575, 185, col, -1);
-	textout_ex(bmp,font, "[R] Roll", 575, 195, col, -1);
-	textout_ex(bmp,font, "[P] Pitch", 575, 205, col, -1);
-	textout_ex(bmp,font, "[W] Yaw", 575, 215, col, -1);
-	textout_ex(bmp,font, "[C] Reset gains to default", 575, 225, col, -1);	
+	textout_ex(bmp,font, "GAINS", 1141, 153, col, -1);
+	textout_ex(bmp,font, "Kp      Kd", 1261, 153, col, -1);
+	textout_ex(bmp,font, "[X] Xpos", 1141, 165, col, -1);
+	textout_ex(bmp,font, "[Y] Ypos", 1141, 175, col, -1);
+	textout_ex(bmp,font, "[Z] Altitude", 1141, 185, col, -1);
+	textout_ex(bmp,font, "[R] Roll", 1141, 195, col, -1);
+	textout_ex(bmp,font, "[P] Pitch", 1141, 205, col, -1);
+	textout_ex(bmp,font, "[W] Yaw", 1141, 215, col, -1);
+	textout_ex(bmp,font, "[C] Reset gains to default", 1141, 225, col, -1);	
 }
 
 void draw_exit_screen(BITMAP* bmp, int col)
@@ -103,6 +104,36 @@ int gen_obstacles(Obstacle* arr_obstacles, int n_obs)
 	arr_obstacles[1].y1 = (-100 + ENV_OFFSET_Y) / ENV_SCALE;
 	arr_obstacles[1].x2 = (560 - ENV_OFFSET_X) / ENV_SCALE;
 	arr_obstacles[1].y2 = (-200 + ENV_OFFSET_Y) / ENV_SCALE;
+
+	arr_obstacles[2].x1 = (400 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[2].y1 = (-400 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[2].x2 = (450 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[2].y2 = (-450 + ENV_OFFSET_Y) / ENV_SCALE;
+
+	arr_obstacles[3].x1 = (650 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[3].y1 = (-500 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[3].x2 = (700 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[3].y2 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+
+	arr_obstacles[4].x1 = (550 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[4].y1 = (-400 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[4].x2 = (650 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[4].y2 = (-450 + ENV_OFFSET_Y) / ENV_SCALE;	
+
+	arr_obstacles[5].x1 = (800 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[5].y1 = (-150 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[5].x2 = (950 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[5].y2 = (-450 + ENV_OFFSET_Y) / ENV_SCALE;
+	
+	arr_obstacles[6].x1 = (800 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[6].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[6].x2 = (1000 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[6].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
+		
+	arr_obstacles[7].x1 = (400 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[7].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[7].x2 = (480 - ENV_OFFSET_X) / ENV_SCALE;
+	arr_obstacles[7].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
 	
 	return 0;
 	
@@ -326,16 +357,16 @@ void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 {
 	char text[4];
 	
-	rectfill(bmp, 745, 40, 795, 125, makecol(0, 0, 0));
+	rectfill(bmp, 1328, 40, 1361, 125, makecol(0, 0, 0));
 	
 	for(int i = 0; i < size; i++)
 	{
 		sprintf(text, "%d", tp[i]);
 		
 		if (i == sel)
-			textout_ex(bmp,font, text, 750, 45 + 10 * i, makecol(255, 165, 0), -1);
+			textout_ex(bmp,font, text, 1329, 45 + 10 * i, makecol(255, 165, 0), -1);
 		else
-			textout_ex(bmp,font, text, 750, 45 + 10 * i, COL_GREEN, -1);
+			textout_ex(bmp,font, text, 1329, 45 + 10 * i, COL_GREEN, -1);
 	}
 	
 }
@@ -400,16 +431,16 @@ void draw_gains(BITMAP* bmp, double* p, double* d, int sel)
 {
 char text[20];
 	
-	rectfill(bmp, 672, 164, 795, 216, makecol(0, 0, 0));
+	rectfill(bmp, 1238, 164, 1361, 216, makecol(0, 0, 0));
 	
 	for(int i = 0; i < 6; i++)
 	{
 		sprintf(text, "%.1e %.1e", p[i], d[i]);
 		
 		if (i == sel - 2)
-			textout_ex(bmp,font, text, 673, 165 + 10 * i, makecol(255, 165, 0), -1);
+			textout_ex(bmp,font, text, 1239, 165 + 10 * i, makecol(255, 165, 0), -1);
 		else
-			textout_ex(bmp,font, text, 673, 165 + 10 * i, COL_GREEN, -1);
+			textout_ex(bmp,font, text, 1239, 165 + 10 * i, COL_GREEN, -1);
 	}
 }
 

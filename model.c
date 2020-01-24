@@ -67,7 +67,7 @@ WPoint xy_setpoint;
 	{
 		if(wp_flags[i] == 0)
 		{
-			printf("WP %f %f \n", wp[i].x, wp[i].y);
+			//printf("WP %f %f \n", wp[i].x, wp[i].y);
 			xy_setpoint.x = (wp[i].x - ENV_OFFSET_X) / ENV_SCALE;
 			xy_setpoint.y = (ENV_OFFSET_Y - wp[i].y) / ENV_SCALE;
 			break;
@@ -445,8 +445,8 @@ int chk_collisions(double* pose, Obstacle* obs, int n_obs)
 	
 	env.x1 = 0.0;
 	env.y1 = 0.0;
-	env.x2 = 520 / ENV_SCALE;
-	env.y2 = 590 / ENV_SCALE;
+	env.x2 = (WIDTH_SCREEN - 266) / ENV_SCALE;
+	env.y2 = (HEIGHT_SCREEN - 5) / ENV_SCALE;
 	
 	int result = 0;
 
@@ -513,4 +513,30 @@ void reset_gains(double* p, double* d, double* p_df, double* d_df)
 {
 	memcpy(p, p_df, sizeof(double) * 6);
 	memcpy(d, d_df, sizeof(double) * 6);
+}
+
+double deg2rad(double n)
+{
+	return n * M_PI / 180;	
+}
+
+
+double rad2deg(double n)
+{
+	return n * 180 / M_PI;	
+}
+
+double pow2(double n)
+{
+	return n * n;
+}
+
+double atan2_safe(double y, double x)
+{
+double r = atan2(y, x);
+
+	if(r < 0) return (2 * M_PI + r);
+	
+	return r;
+	
 }

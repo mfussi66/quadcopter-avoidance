@@ -64,12 +64,12 @@ void adjust_gain(double* p, double* d, int mode, int updown);
 
 void reset_gains(double* p, double* d, double* p_df, double* d_df);
 
-// double rad2deg(double n);
-// 
-// double deg2rad(double n);
-// 
-// double pow2(double n);
-// 
-// double atan2_safe(double y, double x);
+double rad2deg(double n);
+
+double deg2rad(double n);
+
+double pow2(double n);
+
+double atan2_safe(double y, double x);
 
 #endif

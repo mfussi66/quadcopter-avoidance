@@ -249,7 +249,7 @@ double total_forces[SIZE_U] = {0.0};
 		
 		if(dist <= 0.1 && waypoint_idx >= waypoints_num)
 		{
-			printf("Waypoint %d reached\n", waypoint_idx);
+			//printf("Waypoint %d reached\n", waypoint_idx);
 			setpoint_rpy[2] = state[2];
 		}
 		else if(dist <= 0.1 && waypoint_idx < waypoints_num)
@@ -339,7 +339,7 @@ Trace old_traces[N_BEAMS];
 double initialpose[6] = {0.0};
 double old_pose[6] = {0.0};
 double pose[6] = {0.0};
-double rep_forces_xyz[3] = {0.0};
+double repulsive_forces[3] = {0.0};
 double rep_forces[SIZE_U] = {0.0};
 double rep_force_angle = 0.0;
 double rep_force_ampli = 0.0;
@@ -399,10 +399,10 @@ double new_yaw;
 
 // 		new_yaw = compute_yaw_ref(arr_state[2], &target, res, 1); 
 
-		compute_repulsive_force(laser_traces, N_BEAMS, pose, rep_forces_xyz);
+		compute_repulsive_force(laser_traces, N_BEAMS, pose, repulsive_forces);
 		
-		rep_forces[0] = 4e-6 * rep_forces_xyz[1] + 2e-6 * arr_state[10]; //tau_roll
-		rep_forces[1] = 0 * rep_forces_xyz[0]  + 0 * arr_state[9]; //tau_pitch
+		rep_forces[0] = 4e-6 * repulsive_forces[1] + 2e-6 * arr_state[10]; //tau_roll
+		rep_forces[1] = 0 * repulsive_forces[0]  + 0 * arr_state[9]; //tau_pitch
 
 		pthread_mutex_unlock(&mux_rep_forces);
 		memcpy(arr_repulsive_forces, rep_forces, sizeof(double) * SIZE_U);
@@ -624,22 +624,27 @@ double new_forces[SIZE_U] = {0.0};
 		shift_and_append(plt_buf_Z, PLT_DATA_SIZE, new_pose[5]);
     
 		pthread_mutex_lock(&mux_gfx);
-				
-		rectfill(buffer_gfx, 696, 286, PLT_XPOS_XCOORD - 1, PLT_XPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 391, PLT_YPOS_XCOORD - 1, PLT_YPOS_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 696, 496, PLT_ZPOS_XCOORD - 1, PLT_ZPOS_YCOORD - 1, makecol(0,0,0));
+					
+		rectfill(buffer_gfx, PLT_11_XCOORD - 99, PLT_11_YCOORD - 99, 
+				 PLT_11_XCOORD - 1, PLT_11_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, PLT_21_XCOORD - 99, PLT_21_YCOORD - 99, 
+				 PLT_11_XCOORD - 1, PLT_11_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, PLT_31_XCOORD - 99, PLT_11_YCOORD - 99, 
+				 PLT_31_XCOORD - 1, PLT_31_YCOORD - 1, makecol(0,0,0));
+		update_plot(buffer_gfx, plt_buf_tauX, PLT_11_XCOORD, PLT_11_YCOORD, 1e4);
+		update_plot(buffer_gfx, plt_buf_tauY, PLT_21_XCOORD, PLT_21_YCOORD, 1e4);
+		update_plot(buffer_gfx, plt_buf_tauZ, PLT_31_XCOORD, PLT_31_YCOORD, 5e3);
 		
-		rectfill(buffer_gfx, 580 + 1, 285 + 1, 680 - 1, 385 - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 580 + 1, 390 + 1, 680 - 1, 490 - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, 580 + 1, 495 + 1, 680 - 1, 595 - 1, makecol(0,0,0));
-		
-		update_plot(buffer_gfx, plt_buf_Roll, PLT_XPOS_XCOORD - 115, PLT_XPOS_YCOORD, 5e7);
-		update_plot(buffer_gfx, plt_buf_Pitch, PLT_YPOS_XCOORD - 115, PLT_YPOS_YCOORD, 1e9);
-		update_plot(buffer_gfx, plt_buf_Z, PLT_ZPOS_XCOORD - 115, PLT_ZPOS_YCOORD, 1);
-		
-		update_plot(buffer_gfx, plt_buf_tauX, PLT_XPOS_XCOORD, PLT_XPOS_YCOORD, 1e4);
-		update_plot(buffer_gfx, plt_buf_tauY, PLT_YPOS_XCOORD, PLT_YPOS_YCOORD, 1e4);
-		update_plot(buffer_gfx, plt_buf_tauZ, PLT_ZPOS_XCOORD, PLT_ZPOS_YCOORD, 5e3);
+		rectfill(buffer_gfx, PLT_12_XCOORD - 99, PLT_12_YCOORD - 99, 
+				 PLT_12_XCOORD - 1, PLT_12_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, PLT_22_XCOORD - 99, PLT_22_YCOORD - 99,
+				 PLT_22_XCOORD - 1, PLT_22_YCOORD - 1, makecol(0,0,0));
+		rectfill(buffer_gfx, PLT_32_XCOORD - 99, PLT_32_YCOORD - 99, 
+				 PLT_32_XCOORD - 1, PLT_32_YCOORD - 1, makecol(0,0,0));
+		update_plot(buffer_gfx, plt_buf_Roll, PLT_12_XCOORD, PLT_12_YCOORD, 5e7);
+		update_plot(buffer_gfx, plt_buf_Pitch, PLT_22_XCOORD, PLT_22_YCOORD, 1e9);
+		update_plot(buffer_gfx, plt_buf_Z, PLT_32_XCOORD , PLT_32_YCOORD, 1);
+
 		
 		pthread_mutex_unlock(&mux_gfx);
 
