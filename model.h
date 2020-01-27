@@ -20,6 +20,7 @@ typedef gsl_matrix Matrix;
 #define Jyy 0.0099
 #define Jzz 0.0189
 #define M 0.42
+
 /* Model */
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
@@ -28,7 +29,9 @@ void lin_model(double* u, double* x, double yaw_sp);
 
 void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d);
 
-void pid_xy_control(double* e, double* e_prev, double* rp_sp, double* p, double* d);
+void pid_xy_control(double* e, double* e_prev, double* vel_sp, double* p, double* d);
+
+void pid_vel_control(double* e, double* e_prev, double* rp_sp, double* p, double* d);
 
 void rotate_error(double* e, double yaw);
 
@@ -37,8 +40,6 @@ void pid_control(double* e, double* e_prev, double* u, double yaw);
 void compute_setpoint(double* sp, WPoint* wp, double* pose, double alt, int wp_size, int* wp_flags);
 
 void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u, double yaw);
-
-double compute_yaw_ref(double yaw, WPoint* sp, double yaw_laser, double gain);
 
 void compute_error(double* sp, double* x, double* e, double* e_old, int size);
 
@@ -54,7 +55,15 @@ void find_valleys(double* hist, Valley* valleys, int size, int* v_size, int thre
 
 double compute_heading(Trace* tr, Valley* v, int v_size, double* pose, WPoint* sp);
 
-void compute_repulsive_force(Trace* tr, int n, double* pose, double* rep_force);
+Trace get_shortest_beam(Trace* tr, double threshold);
+
+void compute_repulsive_force(Trace* tr, double* pose, double *rep_forces, double ampli_thr);
+
+int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir);
+
+void compute_avoid_sp(double* pose, int mode, double *vel_sp, double *yaw_sp, int turn_dir);
+
+//int compute_avoid_sp(Trace* tr, double* pose, WPoint* target, double ampli_thr, double *vel_sp, double *yaw_sp);
 
 int chk_collisions(double* pose, Obstacle* obs, int n_obs);
 
@@ -71,5 +80,9 @@ double deg2rad(double n);
 double pow2(double n);
 
 double atan2_safe(double y, double x);
+
+double anglediff_safe(double sp, double theta);
+
+double get_uniform_num();
 
 #endif

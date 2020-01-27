@@ -20,7 +20,12 @@ void compute_error(double* sp, double* x, double* e, double* e_old, int size)
 		e[i] = sp[i] - x[i];
 	}
 }
-
+/* 
+ * Function: error rotation
+ * ---------------------------
+ * Rotates the error vector towards the body frame on
+ * the yaw axis
+ */
 void rotate_error(double* e, double yaw)
 {
 double e_tmp[3] = {0.0};
@@ -54,7 +59,7 @@ double compute_pos_dist(double* v1, double* v2)
 /* 
  * Function: setpoint getter and computation
  * ---------------------------
- * 
+ * Gets the next waypoint in the vector
  */
 void compute_setpoint(double* sp, WPoint* wp, double* pose, double alt, int wp_size, int* wp_flags)
 {
@@ -80,32 +85,40 @@ WPoint xy_setpoint;
 }
 
 
-double compute_yaw_ref(double yaw, WPoint* sp, double yaw_laser, double gain)
+/* 
+ * Function: Position PID
+ * ---------------------------
+ * Implements a simple PD controller for position
+ * control
+ */
+void pid_xy_control(double* e, double* e_prev, double* vel_sp, double* p, double* d)
 {
-	
-double yaw_ref;
-double a_r;
-
-	a_r = yaw;
-
-	yaw_ref = a_r + gain * (yaw_laser);
-	
-	//printf("yaw: %f rel:%f d:%f\n", rad2deg(a_r), rad2deg(yaw_laser), rad2deg(yaw_ref));
-		
-	return yaw_ref;
-	
+	// X velocity
+	vel_sp[0] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);	
+	// Y velocity
+	vel_sp[1] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
 }
 
-void pid_xy_control(double* e, double* e_prev, double* rp_sp, double* p, double* d)
+/* 
+ * Function: Position PID
+ * ---------------------------
+ * Implements a simple P controller for velocity control
+ */
+void pid_vel_control(double* e, double* e_prev, double* rp_sp, double* p, double* d)
 {
-		
 	// roll
-	rp_sp[0] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	rp_sp[0] = e[1] * p[6] + d[6] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
 	// pitch
-	rp_sp[1] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
-
+	rp_sp[1] = e[0] * p[7] + d[7] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
 }
 
+
+/* 
+ * Function: Forces PD control
+ * ---------------------------
+ * Implements a PD control that gives the control 
+ * outputs to the system: RPY torques and vertical thrust
+ */
 void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d)
 {
 	// tau roll
@@ -117,8 +130,6 @@ void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double
 	
 	// vertical thrust
 	u[3] = 0.0;
-	
-//	printf("u0: %lf, u1: %lf\n", u[0], u[1] * 1e7);
 }
 
 /* 
@@ -178,6 +189,13 @@ void quad_linear_model(Vector* u, Matrix* A, Matrix* B, Vector* x)
 	
 }
 
+/* 
+ * Function: Linearized system equation
+ * ---------------------------
+ * Implements the linearized quadcopter dynamic equations
+ * Before position integration the step is rotated in the
+ * world frame to accumulate correctly
+ */
 void lin_model(double* u, double* x, double yaw_sp)
 {
 	double X_old[SIZE_X] = {0.0};
@@ -213,7 +231,6 @@ void lin_model(double* u, double* x, double yaw_sp)
 	X_new[3] = X_old[3] + X_new[3];
 	X_new[4] = X_old[4] + X_new[4];
 
-//	printf("p: (%f, %f) \n", xy_tmp[0], xy_tmp[1]);
 	memcpy(x, X_new, sizeof(double) * SIZE_X);
 }
 /* 
@@ -228,10 +245,11 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
 	
 	for(int i = 0; i < n; i++)
 	{
-		tr[i].x = BEAM_DMIN;
-		tr[i].y = BEAM_DMIN;
-		tr[i].z = BEAM_DMIN;
+		tr[i].x = BEAM_DMAX;
+		tr[i].y = BEAM_DMAX;
+		tr[i].z = BEAM_DMAX;
 		tr[i].theta = 0.0;
+		tr[i].d = BEAM_DMAX;
 		//printf("beam %d, x: %f, y: %f \n", i,tr[i].x,tr[i].y);
 	}
 	
@@ -264,65 +282,77 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 			trace_px.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + trace_mt.x);
 			trace_px.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + trace_mt.y);
 
+			tr[i].d = d;
 			tr[i].x = trace_mt.x;
 			tr[i].y = trace_mt.y;
 			tr[i].theta = deg2rad((double)a) + yaw;
-
+			
 			if (getpixel(bmp, (int)trace_px.x, (int)trace_px.y) == makecol(0, 255, 0))
 				break;
 
 			d += BEAM_DSTEP;
 		}
+		//printf("theta %d: %f\n",i,tr[i].theta);
 		//printf("%d a: %f (%.2lf, %.2lf)\n", i,rad2deg(atan2(tr[i].y, tr[i].x)), trace_px.x, trace_px.y);
 		if(i < n) i++;
 	}
-	//printf("----\n");
+	//printf("^^^^\n");
 }
 
-void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_body)
+/* 
+ * Function: Get the shortest beam
+ * ---------------------------
+ * Takes the array of beams of the laser reader and returns 
+ * the shortest beam
+ */
+Trace get_shortest_beam(Trace* tr, double threshold)
 {
-	Trace force_max;
-	double trace_min = 1;
-	double trace_tmp;
-	
-	force_max.x = 0.0;
-	force_max.y = 0.0;
-	force_max.z = 0.0;
+Trace force_max;
+double trace_min = BEAM_DMAX;
+force_max.x = 0.0;
+force_max.y = 0.0;
+force_max.z = 0.0;
 
-	double yaw = pose[2];
-	double tr_ampli = 0.0;
-	double tr_angle = 0.0;
-	
-	for(int i = 0; i < n; i++)
+	for(int i = 0; i < N_BEAMS; i++)
 	{
-		trace_tmp = sqrt(pow2(tr[i].x) + pow2(tr[i].y));
-		if(trace_tmp < trace_min)
+		if(tr[i].d < trace_min)
 		{
-			trace_min = trace_tmp;
-			tr_angle = tr[i].theta;
-			force_max.x = BEAM_DMAX * cos(tr_angle) - tr[i].x;
-			force_max.y = BEAM_DMAX * sin(tr_angle) - tr[i].y;
-			force_max.z = 0.0; 
+			memcpy(&force_max, &tr[i], sizeof(Trace));
+ 			trace_min = tr[i].d;
 		}
 	}
-	
-	tr_ampli = sqrt(force_max.x * force_max.x + force_max.y * force_max.y);
-	tr_angle = atan2(force_max.y, force_max.x);
-	
-	if (tr_ampli > 0)
-	{
-		rep_force_body[0] = force_max.x * cos(yaw) + force_max.y * sin(yaw);
-		rep_force_body[1] = - force_max.x * sin(yaw) + force_max.y * cos(yaw);
-		rep_force_body[2] = force_max.z;
 
-// 		rep_force_body[0] = force_max.x;
-// 		rep_force_body[1] = force_max.y;
-// 		rep_force_body[2] = force_max.z;
+	return force_max;
+}
+
+void compute_repulsive_force(Trace* tr, double* pose, double *rep_forces, double ampli_thr)
+{
+
+double yaw = pose[2];
+double tr_ampli = 0.0;
+double tr_angle = 0.0;
+double rotated_vel[2] = {0.0};
+double rep_force_body[3] = {0.0};
+
+	//tr_ampli = sqrt(tr->x * tr->x + tr->y * tr->y);
+	//tr_angle = atan2_safe(tr->y, tr->x);	
+	tr_ampli = tr->d;
+	tr_angle = tr->theta;
+	
+	if (tr_ampli > ampli_thr)
+	{
+		rep_force_body[0] = tr->x * cos(tr_angle) + tr->y * sin(tr_angle);
+		rep_force_body[1] = - tr->x * sin(tr_angle) + tr->y * cos(tr_angle);
+		rep_force_body[2] = tr->z;
 
 		tr_ampli = sqrt(pow2(rep_force_body[0]) + pow2(rep_force_body[1]));
 		
 		rep_force_body[0] = rep_force_body[0] / tr_ampli; 
 		rep_force_body[1] = rep_force_body[1] / tr_ampli; 
+		
+		rotated_vel[0] = pose[9] * cos(tr_angle) + pose[10] * sin(tr_angle);
+		rotated_vel[1] = - pose[9] * sin(tr_angle) + pose[10] * cos(tr_angle);
+		
 		//printf("rfb_x: %f, rfb_y: %f\n",rep_force_body[0], rep_force_body[1]);
 	}
 	else
@@ -330,8 +360,176 @@ void compute_repulsive_force(Trace* tr, int n, double* pose, double *rep_force_b
 		rep_force_body[0] = 0.0;
 		rep_force_body[1] = 0.0;
 		rep_force_body[2] = 0.0;
-	}	
+	}
+
+	//printf("rv: (%f, %f) a: %f\n",rotated_vel[0], rotated_vel[1], rad2deg(tr_angle + M_PI));
+	
+	rep_forces[0] = - 1e-6 * rep_force_body[1] - 1e-6 * rotated_vel[1]; //tau_roll
+	rep_forces[1] = - 1e-7 * rep_force_body[0] - 0 * rotated_vel[0]; //tau_pitch
+
+	printf("rf: (%f, %f) a: %f\n",rep_forces[0] * 1e9, rep_forces[1] * 1e9, rad2deg(tr_angle));
+	printf("---\n");
+	
 }
+
+/* 
+ * Function: Set avoidance mode
+ * ---------------------------
+ * Sets the appropriate obstacle avoidance mode according
+ * to the angle and amplitude of the shortest beam wrt to 
+ * the drone
+ */
+int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir)
+{
+int i_nearest = 0;
+double a_nearest = M_PI;
+double direct = atan2_safe(target->y - pose[4], target->x - pose[3]);
+double dist = sqrt(pow2(target->x - pose[3]) + pow2(target->y - pose[4]));
+Trace min_trace;
+double angle_diff = 0.0;
+int mode = 0;
+
+	min_trace = get_shortest_beam(tr, 1);
+		
+	// take the beam closest to the setpoint
+	for(int i = 0; i < N_BEAMS; i++)
+	{
+		if(fabs(anglediff_safe(direct, tr[i].theta)) < fabs(a_nearest))
+		{
+			i_nearest = i;
+			a_nearest = anglediff_safe(direct, tr[i].theta);
+		}
+	}
+	
+	angle_diff = min_trace.theta - pose[2];
+	
+	if (angle_diff < 0)
+		*turn_dir = 1;
+	else
+		*turn_dir = -1;
+	
+	printf("ad: %f\n", angle_diff);
+	
+	// Emergency avoidance mode
+	if(min_trace.d <= 0.6)
+	{
+		return 1;
+	}
+	
+	// If the the goal is closer than the shortest beam
+	if(dist <= tr[i_nearest].d)
+	{
+		return 0;
+	}
+	
+	// Sets the primary avoidance modes
+	if(min_trace.d <= 1)
+	{
+		// if the obstacle if more or less in front of the quadc.
+		if(fabs(angle_diff) <= deg2rad(30))
+		{
+			//if(get_uniform_num() >= 0.5) {*turn_dir = 1;}
+			//else {*turn_dir = -1;}
+			return 1;
+		}
+		// rotate 1
+		if(fabs(angle_diff) > deg2rad(30))
+			return 2;
+	}
+
+	return mode;
+	
+}
+
+/* 
+ * Function: Set velocity setpoints
+ * ---------------------------
+ * Sets the appropriate velocity setpoints to avoid 
+ * obstacles according to the modes chosen
+ */
+void compute_avoid_sp(double* pose, int mode, double *vel_sp, double *yaw_sp, int turn_dir)
+{
+double vel_rot[2] = {0.0};
+
+	if (mode == 2)
+	{	
+		//*yaw_sp = pose[2];
+		vel_rot[1] = turn_dir * 0.5;
+		vel_rot[0] = turn_dir * 0.5;
+		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
+		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
+		
+	}
+	else if (mode == 3)
+	{	
+		//*yaw_sp = pose[2];
+		vel_rot[1] = -0.3;
+		vel_rot[0] = -0.3;
+		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
+		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);		
+	}
+	else if(mode == 1)
+	{
+		*yaw_sp = pose[2];
+		vel_rot[1] = turn_dir * 0.3;
+		vel_rot[0] = 0.0;
+		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
+		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
+	}
+	
+}
+
+/*
+int compute_avoid_sp(Trace* tr, double* pose, WPoint* target, double ampli_thr, double *vel_sp, double *yaw_sp)
+{
+double tr_ampli = tr->d;
+double tr_angle = tr->theta;
+double vel_rot[2] = {0.0};
+double rot_dir = -1;
+double sp_dir = atan2_safe(target->y - pose[4], target->x - pose[3]);
+
+int mode = 0;
+
+	if (tr_ampli > ampli_thr)
+	{	
+		if(tr_angle - pose[2] >= -M_PI/2 && tr_angle - pose[2] <= 0) 
+			rot_dir = 1;
+		else if(tr_angle - pose[2] <= M_PI/2 && tr_angle - pose[2] > 0)
+			rot_dir = -1;
+
+		vel_rot[1] = rot_dir * 0.3;		// velocity y-axis BODY (roll)
+		
+		// if the obstacle if more or less in front of the quadc.
+		if(tr_angle - pose[2] >= -M_PI/7 && tr_angle - pose[2] <= M_PI/7)
+		{
+			printf("stopping pitch vel\n");
+			*yaw_sp = pose[2];
+			vel_rot[0] = 0.0;
+			vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
+			vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
+			mode = 2;
+		}
+		else
+		{
+			vel_rot[0] = 0.1;
+			vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
+			vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
+			mode = 1;
+		}
+	}
+	else
+	{
+
+		vel_rot[0] = 0;	// velocity x-axis BODY
+		vel_sp[1] = 0;	// velocity y-axis BODY
+		mode = 0;
+	}
+	
+	return mode;
+	
+}
+*/
+
 
 
 void compute_histogram(Trace* tr, int n, double* hist)
@@ -354,6 +552,7 @@ void find_valleys(double* hist, Valley* valleys, int size, int* v_size, int thre
 int start_found = 0;
 int j = 0;
 
+	// initialize valleys values
 	for(int i = 0; i < size; i++)
 	{
 		valleys[i].start = 0;
@@ -362,13 +561,23 @@ int j = 0;
 
 	for(int i = 0; i < size; i++)
 	{
-		if (hist[i] < threshold && start_found == 0)
+		
+		if (hist[i] < threshold && start_found == 0) //save start of valley
 		{
+			//printf("found valley start:%d h:%f\n", i, hist[i]);
 			valleys[j].start = i;
 			start_found = 1;
 		}
-		else if(hist[i] >= threshold && start_found == 1)
+		else if(hist[i] >= threshold && start_found == 1) // save end of valley
 		{
+			//printf("found valley end:%d h:%f\n ", i - 1, hist[i]);
+			valleys[j].end = i - 1;
+			start_found = 0;
+			j++;
+		}
+		else if(i == size - 1 && start_found == 1) //save the end of valley at end
+		{
+			//printf("found valley end:%d h:%f\n ", i, hist[i]);
 			valleys[j].end = i;
 			start_found = 0;
 			j++;
@@ -388,54 +597,64 @@ double a_end;
 int i_end;
 int i_nearest = 0;
 int i_nearest_tmp = 0;
+int candidate_valley = 0;
 double a_nearest = M_PI;
 double a_nearest_tmp = M_PI;
 double theta_rel = 0.0;
+double yaw_ref = 0.0;
 
+	yaw_ref = atan2_safe(sp->y - pose[4],sp->x - pose[3]);
 	dist[0]= sp->x - pose[3];
 	dist[1]= sp->y - pose[4];
 
 	for(int i = 0; i < v_size; i++)
 	{
 		i_start = v[i].start;
-		a_start = tr[i_start].theta - pose[2];
-		//a_start = atan2(tr[j].y - dist[1], tr[j].x - dist[0]);
+		a_start = anglediff_safe(yaw_ref, tr[i_start].theta);
 		
 		i_end = v[i].end;
-		a_end = tr[i_end].theta - pose[2];
-		//a_end = atan2(tr[j].y - dist[1], tr[j].x - dist[0]);
+		a_end = anglediff_safe(yaw_ref, tr[i_end].theta);
+
+		printf("v%d: (%d, %d) (%f, %f)\n",i, i_start, i_end, rad2deg(a_start), rad2deg(a_end));
 		
-		if(fabs(a_end) > fabs(a_start))
+		if(fabs(a_end) < fabs(a_start))
 		{
-			i_nearest = i_end;
+			i_nearest_tmp = i_end;
 			a_nearest_tmp = a_end;
 		}
 		else
 		{
-			i_nearest = i_start;
+			i_nearest_tmp = i_start;
 			a_nearest_tmp = a_start;
 		}
 		
 		if(a_nearest_tmp <= a_nearest)
 		{
+			candidate_valley = i;
 			i_nearest = i_nearest_tmp;
 			a_nearest = a_nearest_tmp;
 		}
 	}
 	
-	i_start = v[i_nearest].start;
-	i_end = v[i_nearest].end;
+	i_start = v[candidate_valley].start;
+	i_end = v[candidate_valley].end;
+	printf("%d (%d, %d)\n",candidate_valley, i_start, i_end);
+		
+	theta_rel = (tr[i_start].theta + tr[i_end].theta) / 2;
 	
-	theta_rel = (atan2_safe(tr[i_start].y, tr[i_start].x) + atan2_safe(tr[i_end].y, tr[i_end].x)) / 2;
-	
-	printf("(%f, %f)\n", rad2deg(atan2_safe(tr[i_start].y, tr[i_start].x)), rad2deg(atan2_safe(tr[i_end].y, tr[i_end].x)));
-	printf("(%d, %d) %f\n", i_start, i_end, rad2deg(theta_rel));
+	printf("(%f - %f)\n",rad2deg(theta_rel), rad2deg(pose[2]));
 	printf("---\n");
 	
 	return theta_rel;
 	
 }
 
+/* 
+ * Function: Check collision
+ * ---------------------------
+ * checks if the baricenter of the quadcopter is inside the 
+ * environment or inside an obstalce
+ */
 int chk_collisions(double* pose, Obstacle* obs, int n_obs)
 {
 	double x = pose[3];
@@ -466,55 +685,77 @@ int chk_collisions(double* pose, Obstacle* obs, int n_obs)
 	return result;
 }
 
+/* 
+ * Function: Init controller gains
+ * ---------------------------
+ */
 void init_gains(double* p, double* d, double* p_df, double* d_df)
 {
+	
 	// proportional gains
-	p[0] = 1e-6;	// x
-	p[1] = 1e-6;	// y
+	p[0] = 1.5e-1;	// x
+	p[1] = 1.5e-1;	// y
 	p[2] = 1e-4;	// z
 	p[3] = 1e-3;	// roll
 	p[4] = 1e-3;	// pitch
 	p[5] = 1e-4;	// yaw
+	p[6] = 7e-2;	// u
+	p[7] = 7e-2;	// v
+	p[8] = 1e-2;	// w
 	
 	// derivative gains
-	d[0] = 3e-4;	// x
-	d[1] = 3e-4;	// y
+	d[0] = 0;		// x
+	d[1] = 0;		// y
 	d[2] = 1e-3;	// z
 	d[3] = 1e-3;	// roll
 	d[4] = 1e-3;	// pitch
-	d[5] = 4e-3;	// yaw
+	d[5] = 8e-3;	// yaw
+	d[6] = 0;		// u
+	d[7] = 0;		// v
+	d[8] = 0;		// w	
 	
-	memcpy(p_df, p, sizeof(double) * 6);
-	memcpy(d_df, d, sizeof(double) * 6);
+	memcpy(p_df, p, sizeof(double) * SIZE_PID);
+	memcpy(d_df, d, sizeof(double) * SIZE_PID);
 }
 
+/* 
+ * Function: Modify controller gains
+ * ---------------------------
+ */
 void adjust_gain(double *p, double *d, int mode, int updown)
 {
 int idx = mode - 2;
 	
-	if(idx < 0) return;
+	if(idx < 0 || idx >= SIZE_PID) return;
 	
 	if(updown == 0)
 	{
 		p[idx] *= 2;
-		d[idx] *= 2;
+		//d[idx] *= 2;
 	}
 	else if(updown == 1)
 	{
 		p[idx] /= 2;
-		d[idx] /= 2;
+		//d[idx] /= 2;
 	}
 	
-	//printf("Adjusted %d p: %lf, d: %lf\n",idx,p[idx] * 1e6, d[idx] * 1e6);
-	
 }
 
+/* 
+ * Function: Reset gains to default values
+ * ---------------------------
+ */
 void reset_gains(double* p, double* d, double* p_df, double* d_df)
 {
-	memcpy(p, p_df, sizeof(double) * 6);
-	memcpy(d, d_df, sizeof(double) * 6);
+	memcpy(p, p_df, sizeof(double) * SIZE_PID);
+	memcpy(d, d_df, sizeof(double) * SIZE_PID);
 }
 
+
+/* 
+ * Helper Functions
+ * ---------------------------
+ */
 double deg2rad(double n)
 {
 	return n * M_PI / 180;	
@@ -538,5 +779,32 @@ double r = atan2(y, x);
 	if(r < 0) return (2 * M_PI + r);
 	
 	return r;
+}
+
+double anglediff_safe(double sp, double theta)
+{
+double res = sp - theta;
+
+	if (res < M_PI && res > -M_PI)
+	{
+		res = sp - theta;
+	}
+	else if (res > M_PI)
+	{
+		res -= 2*M_PI;
+	}
+	else if (res <= -M_PI)
+	{
+		res += 2*M_PI;
+	}
+	
+	return res;
+	
+}
+
+double get_uniform_num()
+{
+	
+	return  rand() / RAND_MAX;
 	
 }

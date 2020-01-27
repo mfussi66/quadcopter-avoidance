@@ -4,6 +4,10 @@
 
 /* Graphics */ 
 
+/* 
+ * Function:Init allegro engine and screen
+ * ---------------------------
+ */
 void start_allegro (void)
 {
 
@@ -11,7 +15,7 @@ void start_allegro (void)
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_AUTODETECT_FULLSCREEN, WIDTH_SCREEN, HEIGHT_SCREEN, 0, 0);
+	set_gfx_mode (GFX_AUTODETECT_WINDOWED, WIDTH_SCREEN, HEIGHT_SCREEN, 0, 0);
     install_keyboard();
 	install_mouse();
 	
@@ -25,6 +29,10 @@ void start_allegro (void)
 
 }
 
+/* 
+ * Function: Closes allegro
+ * ---------------------------
+ */
 void close_allegro(void)
 {
 	
@@ -33,12 +41,20 @@ void close_allegro(void)
     printf("Graphics: Allegro is closed\n");
 }
 
+/* 
+ * Function: Draws gui
+ * ---------------------------
+ * Draws all the static gui objects
+ */
 void build_gui(BITMAP* bmp, FONT* font, int col)
 {
-	// Environment window
-	rect(bmp, 5, 5, 1100, HEIGHT_SCREEN - 5, col);
-
-	// Rectangles that contains the plots
+	// Environment frame
+	rect(bmp, 5, 5, WIDTH_SCREEN - 266, HEIGHT_SCREEN - 5, col);
+	rect(bmp, 6, 6, WIDTH_SCREEN - 267, HEIGHT_SCREEN - 6, col);
+	rect(bmp, 7, 7, WIDTH_SCREEN - 268, HEIGHT_SCREEN - 7, col);
+	rect(bmp, 8, 8, WIDTH_SCREEN - 269, HEIGHT_SCREEN - 8, col);
+	
+	// Rectangles that contain the plots
 	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 315, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 215, col);
 	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 210, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 110, col);
 	rect(bmp, WIDTH_SCREEN - 105, HEIGHT_SCREEN - 105, WIDTH_SCREEN - 5, HEIGHT_SCREEN - 5, col);
@@ -50,9 +66,9 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	textout_centre_ex(bmp, font, "R", WIDTH_SCREEN - 110, PLT_12_YCOORD - 50, col, -1);
 	textout_centre_ex(bmp, font, "P", WIDTH_SCREEN - 110, PLT_22_YCOORD - 50, col, -1);
 	textout_centre_ex(bmp, font, "Z", WIDTH_SCREEN - 110, PLT_32_YCOORD - 50, col, -1);
-	textout_centre_ex(bmp, font, "Tau_X", WIDTH_SCREEN - 245, PLT_11_YCOORD - 50, col, -1);
-	textout_centre_ex(bmp, font, "Tau_Y", WIDTH_SCREEN - 245, PLT_21_YCOORD - 50, col, -1);
-	textout_centre_ex(bmp, font, "Tau_Z", WIDTH_SCREEN - 245, PLT_31_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_X", WIDTH_SCREEN - 242, PLT_11_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_Y", WIDTH_SCREEN - 242, PLT_21_YCOORD - 50, col, -1);
+	textout_centre_ex(bmp, font, "Tau_Z", WIDTH_SCREEN - 242, PLT_31_YCOORD - 50, col, -1);
 	
 	// Editable data
 	textout_ex(bmp,font, "Select with number/letter", 1141, 10, col, -1);
@@ -76,18 +92,30 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	textout_ex(bmp,font, "[Z] Altitude", 1141, 185, col, -1);
 	textout_ex(bmp,font, "[R] Roll", 1141, 195, col, -1);
 	textout_ex(bmp,font, "[P] Pitch", 1141, 205, col, -1);
-	textout_ex(bmp,font, "[W] Yaw", 1141, 215, col, -1);
-	textout_ex(bmp,font, "[C] Reset gains to default", 1141, 225, col, -1);	
+	textout_ex(bmp,font, "[A] Yaw", 1141, 215, col, -1);
+	textout_ex(bmp,font, "[U] Xvel", 1141, 225, col, -1);
+	textout_ex(bmp,font, "[V] Yvel", 1141, 235, col, -1);
+	textout_ex(bmp,font, "[W] Zvel", 1141, 245, col, -1);
+	textout_ex(bmp,font, "[C] Reset gains to default", 1141, 255, col, -1);
 }
 
+/* 
+ * Function: Show fancy exit text
+ * ---------------------------
+ */
 void draw_exit_screen(BITMAP* bmp, int col)
 {
-	textout_centre_ex(bmp, font, "_________________________", 400, 287, col, -1);
-	textout_centre_ex(bmp, font, "   Simulation stopped    ", 400, 300, col, -1);
-	textout_centre_ex(bmp, font, "  Thank you for playing  ", 400, 310, col, -1);
-	textout_centre_ex(bmp, font, "_________________________", 400, 315, col, -1);	
+	textout_centre_ex(bmp, font, "_________________________", WIDTH_SCREEN/2, HEIGHT_SCREEN/2 - 13, col, -1);
+	textout_centre_ex(bmp, font, "   Simulation stopped    ", WIDTH_SCREEN/2, HEIGHT_SCREEN/2, col, -1);
+	textout_centre_ex(bmp, font, "  Thank you for playing  ", WIDTH_SCREEN/2, HEIGHT_SCREEN/2 + 10, col, -1);
+	textout_centre_ex(bmp, font, "_________________________", WIDTH_SCREEN/2, HEIGHT_SCREEN/2 + 15, col, -1);	
 }
 
+/* 
+ * Function: Generate obstacles
+ * ---------------------------
+ * Generates a vector with obstacle coordinates
+ */
 int gen_obstacles(Obstacle* arr_obstacles, int n_obs)
 {
 	size_t n = (uint)n_obs;
@@ -111,9 +139,9 @@ int gen_obstacles(Obstacle* arr_obstacles, int n_obs)
 	arr_obstacles[2].y2 = (-450 + ENV_OFFSET_Y) / ENV_SCALE;
 
 	arr_obstacles[3].x1 = (650 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[3].y1 = (-500 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[3].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
 	arr_obstacles[3].x2 = (700 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[3].y2 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+	arr_obstacles[3].y2 = (-600 + ENV_OFFSET_Y) / ENV_SCALE;
 
 	arr_obstacles[4].x1 = (550 - ENV_OFFSET_X) / ENV_SCALE;
 	arr_obstacles[4].y1 = (-400 + ENV_OFFSET_Y) / ENV_SCALE;
@@ -125,20 +153,24 @@ int gen_obstacles(Obstacle* arr_obstacles, int n_obs)
 	arr_obstacles[5].x2 = (950 - ENV_OFFSET_X) / ENV_SCALE;
 	arr_obstacles[5].y2 = (-450 + ENV_OFFSET_Y) / ENV_SCALE;
 	
-	arr_obstacles[6].x1 = (800 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[6].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
-	arr_obstacles[6].x2 = (1000 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[6].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
-		
-	arr_obstacles[7].x1 = (400 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[7].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
-	arr_obstacles[7].x2 = (480 - ENV_OFFSET_X) / ENV_SCALE;
-	arr_obstacles[7].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
+// 	arr_obstacles[6].x1 = (800 - ENV_OFFSET_X) / ENV_SCALE;
+// 	arr_obstacles[6].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+// 	arr_obstacles[6].x2 = (1000 - ENV_OFFSET_X) / ENV_SCALE;
+// 	arr_obstacles[6].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
+// 		
+// 	arr_obstacles[7].x1 = (400 - ENV_OFFSET_X) / ENV_SCALE;
+// 	arr_obstacles[7].y1 = (-550 + ENV_OFFSET_Y) / ENV_SCALE;
+// 	arr_obstacles[7].x2 = (480 - ENV_OFFSET_X) / ENV_SCALE;
+// 	arr_obstacles[7].y2 = (-650 + ENV_OFFSET_Y) / ENV_SCALE;
 	
 	return 0;
 	
 }
 
+/* 
+ * Function: Draws obstacles
+ * ---------------------------
+ */
 void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col)
 {
 	int X_env[4] = {0}; 
@@ -155,10 +187,23 @@ void draw_obstacles(BITMAP* bmp, Obstacle* obs, int n_obs, int col)
 	
 }
 
+/* 
+ * Function: Add waypoint
+ * ---------------------------
+ * Adds the clicked environment waypoint to the
+ * array of goals if it's inside the environment and
+ * not on an obstacle
+ */
 void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 {
+Obstacle env;
+int n = *num + 1;	
+
 	
-	int n = *num + 1;
+	env.x1 = 5 + 5;
+	env.y1 = 5 + 5;
+	env.x2 = (WIDTH_SCREEN - 266 - 5);
+	env.y2 = (HEIGHT_SCREEN - 5 - 5);
 	
 	if (n >= MAX_WPOINTS)
 	{
@@ -166,9 +211,16 @@ void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 		return;
 	}
 	
-	if (getpixel(bmp, point.x, point.y) == makecol(0, 255, 0))
+	if (getpixel(bmp, point.x, point.y) == COL_GREEN)
 	{
 		printf("Cannot place waypoint on obstacle\n");
+		return;
+	}
+	
+	if(point.x < env.x1 || point.x > env.x2 ||
+		point.y < env.y1 || point.y > env.y2)
+	{
+		printf("Cannot place waypoint outside environment\n");
 		return;
 	}
 	
@@ -181,6 +233,12 @@ void add_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 	*num = n;
 }
 
+/* 
+ * Function: Deletes a waypoint
+ * ---------------------------
+ * Deletes a waypoint by checking which is the closest
+ * from the clicked point
+ */
 void del_waypoint(BITMAP *bmp, WPoint *array, int *num,  WPoint point)
 {
 int clicked_col;
@@ -239,38 +297,46 @@ WPoint tmp_new_array[MAX_WPOINTS];
 	}
 }
 
+/* 
+ * Function: Draw laser beams
+ * ---------------------------
+ */
 void draw_laser_traces(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
 {
 	int red =  makecol(255, 0, 0);
 	int blk = makecol(0,0,0);
 	Trace temp;
-	int X[3] = {0.0};
-	int old_X[3] = {0.0};
+	double X[3] = {0.0};
+	double old_X[3] = {0.0};
 	
-	X[0] = (int)(ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3]));
-	X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (pose[4]));
+	X[0] = (ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3]));
+	X[1] = (ENV_OFFSET_Y - ENV_SCALE * (pose[4]));
 	
-	old_X[0] = (int)(ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3]));
-	old_X[1] = (int)(ENV_OFFSET_Y - ENV_SCALE * (old_pose[4]));
+	old_X[0] = (ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3]));
+	old_X[1] = (ENV_OFFSET_Y - ENV_SCALE * (old_pose[4]));
 	
 	for(int i = 0; i < N_BEAMS; i++)
 	{
 		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (old_pose[3] + old[i].x);
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (old_pose[4] + old[i].y);
 		//temp.z = old_pose[5] + old[i].z;
-		if(getpixel(bmp, (int)temp.x, (int)temp.y) < 0) continue;
-		fastline(bmp, old_X[0], old_X[1], (int)temp.x, (int)temp.y, blk);
+		if(getpixel(bmp, temp.x, temp.y) < 0) continue;
+		fastline(bmp, old_X[0], old_X[1], temp.x, temp.y, blk);
 
 		temp.x = ENV_OFFSET_X + OFFSET_LASER + ENV_SCALE * (pose[3] + new[i].x);
 		temp.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + new[i].y);
 		//temp.z = pose[5] + new[i].z;
-		if(getpixel(bmp, (int)temp.x, (int)temp.y) < 0) continue;
-		fastline(bmp, X[0], X[1], (int)temp.x, (int)temp.y, red);
+		if(getpixel(bmp, temp.x, temp.y) < 0) continue;
+		fastline(bmp, X[0], X[1], temp.x, temp.y, red);
 	}
 	//printf("---\n");
 
 }
 
+/* 
+ * Function: Draw laser beams as points
+ * ---------------------------
+ */
 void draw_laser_points(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, double *pose)
 {
 int red =  makecol(255, 0, 0);
@@ -296,22 +362,33 @@ Trace temp_old = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
 	
 }
 
+/* 
+ * Function: Draw quadcopter actor
+ * ---------------------------
+ * Draws and rotates the quadcopter sprite
+ */
 void draw_quad(BITMAP* bmp, BITMAP* quad, BITMAP* bg, double* old, double* new)
 {
 
 int old_x = ENV_OFFSET_X + (int) (ENV_SCALE * old[3]);
 int old_y = ENV_OFFSET_Y - (int) (ENV_SCALE * old[4]);
-fixed old_yaw = ftofix(old[2] / (2*M_PI)*256);
+fixed old_yaw = ftofix(-old[2] / (2*M_PI)*256);
 
 int x = ENV_OFFSET_X + (int) (ENV_SCALE * new[3]);
 int y = ENV_OFFSET_Y - (int) (ENV_SCALE * new[4]);
-fixed yaw = ftofix(new[2] / (2*M_PI)*256);
+fixed yaw = ftofix(-new[2] / (2*M_PI)*256);
 
 	rotate_sprite(bmp, bg, old_x - bg->w / 2, old_y - bg->h / 2, old_yaw);
 	rotate_sprite(bmp, quad, x - bg->w / 2, y - bg->h / 2, yaw);	
 	
 }
 
+/* 
+ * Function: Draws square
+ * ---------------------------
+ * Draws a rotating square as two triangles
+ * if the quadcopter bitmap is not available
+ */
 void draw_pose(BITMAP* bmp, double* old, double* new)
 {
     
@@ -353,6 +430,12 @@ void draw_pose(BITMAP* bmp, double* old, double* new)
     
 }
 
+/* 
+ * Function: Print tasks' periods
+ * ---------------------------
+ * Draws to screen the periods of all the tasks
+ * Highlights the selected one
+ */
 void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 {
 	char text[4];
@@ -371,6 +454,10 @@ void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 	
 }
 
+/* 
+ * Function: Draws selected waypoints
+ * ---------------------------
+ */
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)
 {
 
@@ -398,6 +485,11 @@ int red = makecol(255, 0, 0);
 	
 }
 
+/* 
+ * Function: Plots update
+ * ---------------------------
+ * Updates the plot of the variable of interest
+ */
 void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double scale)
 {
 	int x = coord_x - (PLT_STEP * PLT_DATA_SIZE);
@@ -406,6 +498,9 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 	int x_prev = x;
 	int y_prev = y;
 	
+	rectfill(bmp, coord_x - 99, coord_y - 99, 
+				coord_x - 1, coord_y - 1, makecol(0,0,0));
+	
 	for(int i = 0; i < PLT_DATA_SIZE; i++)
 	{
 		x = x + PLT_STEP;
@@ -413,10 +508,10 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 		y = coord_y - (data[i] * scale) - PLT_FRAME_SIZE / 2;
 		
 		if (y <= (coord_y - PLT_FRAME_SIZE))
-			y = (coord_y - PLT_FRAME_SIZE);
+			y = coord_y - PLT_FRAME_SIZE - 1;
 		
 		if (y >= coord_y)
-			y = coord_y;
+			y = coord_y + 1;
 		
 		if(getpixel(bmp, x_prev, y_prev) < 0) continue;
 		if(getpixel(bmp, x, y) < 0) continue;
@@ -427,13 +522,19 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 	}
 }
 
+/* 
+ * Function: Print controller gains
+ * ---------------------------
+ * Draws to screen the gains of the controllers
+ * Highlights the selected one
+ */
 void draw_gains(BITMAP* bmp, double* p, double* d, int sel)
 {
 char text[20];
 	
 	rectfill(bmp, 1238, 164, 1361, 216, makecol(0, 0, 0));
 	
-	for(int i = 0; i < 6; i++)
+	for(int i = 0; i < SIZE_PID; i++)
 	{
 		sprintf(text, "%.1e %.1e", p[i], d[i]);
 		
@@ -444,16 +545,57 @@ char text[20];
 	}
 }
 
-void draw_msg(BITMAP* bmp, int mode)
+/* 
+ * Function: Prints message
+ * ---------------------------
+ * Draws a text on a screen location according to a selected
+ * mode
+ */
+void draw_msg(BITMAP* bmp, int mode, int x, int y)
 {
+	
+char text[20];
+
 	if (mode == 0) return;
 	
-	switch(mode)
-		case 1:
-		{
-			textout_centre_ex(bmp, font, "!!! Collision detected !!!", 400, 300,
-							  makecol(0,0,0), makecol(255,0,0));
-			textout_centre_ex(bmp, font, "Press [ESC] to exit simulation", 400, 309,
-							  makecol(0,0,0), makecol(255,0,0));
-		}
+	if(mode == 1)
+	{
+		textout_centre_ex(bmp, font, "!!! Collision detected !!!", x, y,
+							makecol(0,0,0), makecol(255,0,0));
+		textout_centre_ex(bmp, font, "Press [ESC] to exit simulation", x + 5, y + 5,
+							makecol(0,0,0), makecol(255,0,0));
+	}
+	else if(mode == 2)
+	{
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, "Status: Reaching goal", x, y, COL_GREEN, -1);
+	}
+	else if(mode == 3)
+	{
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, "Status: Avoiding", x, y, makecol(255, 165, 0), -1);
+	}
+	else if(mode == 4)
+	{
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, "Click on Starting point", x, y, COL_GREEN, -1);		
+	}
+	else if(mode > 4 && mode < 9)
+	{
+		sprintf(text, "Click on GOAL n.%d", mode - 4);
+		
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, text, x, y,COL_GREEN, -1);		
+	}
+	else if(mode == 9)
+	{
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, "Press [SPACE] to start", x, y,COL_GREEN, -1);		
+	}
+	
 }

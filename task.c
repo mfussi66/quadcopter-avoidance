@@ -117,6 +117,12 @@ struct timespec now;
 	return 0;
 };
 
+/* 
+ * Function: Thread creation
+ * ---------------------------
+ * Initializes the POSIX thread with the attributes,
+ * task parameters structure and then creates it
+ */
 int thread_create (struct task_par *tp, struct sched_param *sp, pthread_attr_t att, pthread_t *tid, void* task)
 {
 int ret = -1;
@@ -139,6 +145,12 @@ int ret = -1;
 
 };
 
+/* 
+ * Function: Mutex initialization
+ * ---------------------------
+ * Initializes the POSIX mutex semaphore and sets 
+ * the priority protocol
+ */
 int mutex_create (pthread_mutex_t mux, pthread_mutexattr_t matt, int prot, int ceiling)
 {
 
@@ -163,6 +175,12 @@ int result = -1;
 
 };
 
+/* 
+ * Function: Selects thread period
+ * ---------------------------
+ * Highlights the selected thread in the temporary
+ * task period buffer and returns its index in the array
+ */
 void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
 {	
 	if(t_idx >= THREAD_MAX_NUM)
@@ -178,6 +196,12 @@ void select_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp, int t_idx)
 	
 };
 
+/* 
+ * Function: Cancel thread editing
+ * ---------------------------
+ * Restores the value of the temporary task
+ * period buffer to the original state
+ */
 void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp)
 {
 	if(*sel_t >= 99) return;
@@ -188,19 +212,31 @@ void cancel_thread_tp(int* sel_t, int* tp_arr, int* sel_t_old_tp)
 	*sel_t = 99;
 }
 
+/* 
+ * Function: Modify thread period
+ * ---------------------------
+ * Modifies the thread period if it's at least 10ms or
+ * smaller than 5s
+ */
 void modify_thread_tp(int* sel_t, int* tp_arr, int val)
 {
 	if(*sel_t >= 99) return;
 	
 	if (tp_arr[*sel_t] + val <= 10 )
 		tp_arr[*sel_t] = 10;
+	else if(tp_arr[*sel_t] + val >= 5000)
+		tp_arr[*sel_t] = 5000;
 	else
 		tp_arr[*sel_t] += val;
 	
 	printf("Mod t: %d p: %d \n", *sel_t, tp_arr[*sel_t]);
 	
 }
-
+/* 
+ * Function: Shifts array to the right
+ * ---------------------------
+ * Also appends new element
+ */
 void shift_and_append (double *array, int size, double new_element)
 {
 	

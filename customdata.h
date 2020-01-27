@@ -11,24 +11,25 @@
 #define SIZE_X 12
 #define SIZE_U 4
 #define SIZE_Y 6
+#define SIZE_PID 9
+
+#define WIDTH_SCREEN 1366
+#define HEIGHT_SCREEN 768
 
 #define ENV_OFFSET_X 20
 #define ENV_OFFSET_Y 743
 #define ENV_SCALE 50
 
 #define MAX_WPOINTS 5
-#define OBS_NUM 8
+#define OBS_NUM 6
 
 #define OFFSET_LASER 0
 #define N_BEAMS 9
-#define BEAM_DMIN 1
+#define BEAM_DMIN 0.4
 #define BEAM_DMAX 5
-#define BEAM_DSTEP 0.005
+#define BEAM_DSTEP 0.01
 
 #define COL_GREEN 48
-
-#define WIDTH_SCREEN 1366
-#define HEIGHT_SCREEN 768
 
 #define PLT_FRAME_SIZE 100
 #define PLT_DATA_SIZE 25
@@ -49,13 +50,13 @@
 #define PLT_31_YCOORD HEIGHT_SCREEN - 5
 
 #define TP_GFX 33
-#define TP_PLOTS 125
+#define TP_PLOTS 80
 #define TP_LSR 30
 #define TP_MODEL 20
 #define TP_POS 10
-#define TP_RPY 10
-#define TP_KEY 100
-#define TP_POINT 80
+#define TP_PLAN 100
+#define TP_KEY 60
+#define TP_POINT 60
 #define TP_GAINS 200
 
 /* --- Project Structures --- */
@@ -65,6 +66,7 @@ typedef struct
 	double x;
 	double y;
 	double z;
+	double d;
 	double theta;
 } Trace;
 

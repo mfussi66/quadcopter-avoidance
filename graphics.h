@@ -44,6 +44,6 @@ void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size)
 
 void draw_gains(BITMAP* bmp, double* p, double* d, int sel);
 
-void draw_msg(BITMAP* bmp, int mode);
+void draw_msg(BITMAP* bmp, int mode, int x, int y);
 
 #endif
