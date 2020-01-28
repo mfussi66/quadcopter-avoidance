@@ -78,12 +78,10 @@ void build_gui(BITMAP* bmp, FONT* font, int col)
 	textout_ex(bmp,font, "[1] KeyBoard", 1141, 55, col, -1);
 	textout_ex(bmp,font, "[2] Waypoints", 1141, 65, col, -1);
 	textout_ex(bmp,font, "[3] Model", 1141, 75, col, -1);
-	textout_ex(bmp,font, "[4] Control", 1141, 85, col, -1);
-	textout_ex(bmp,font, "[5] Laser Scan", 1141, 95, col, -1);
-	textout_ex(bmp,font, "[6] Plots", 1141, 105, col, -1);
-	textout_ex(bmp,font, "[7] LQR iter", 1141, 115, col, -1);
-	textout_ex(bmp,font, "[ENTER] confirm period", 1141, 125, col, -1);
-	textout_ex(bmp,font, "[BACKSPACE] cancel period", 1141, 135, col, -1);
+	textout_ex(bmp,font, "[4] Laser", 1141, 85, col, -1);
+	textout_ex(bmp,font, "[5] Plots", 1141, 95, col, -1);
+	textout_ex(bmp,font, "[ENTER] confirm period", 1141, 105, col, -1);
+	textout_ex(bmp,font, "[BACKSPACE] cancel period", 1141, 115, col, -1);
 	
 	textout_ex(bmp,font, "GAINS", 1141, 153, col, -1);
 	textout_ex(bmp,font, "Kp      Kd", 1261, 153, col, -1);
@@ -440,7 +438,7 @@ void draw_periods(BITMAP* bmp, int* tp, int size, int sel)
 {
 	char text[4];
 	
-	rectfill(bmp, 1328, 40, 1361, 125, makecol(0, 0, 0));
+	rectfill(bmp, 1328, 40, 1361, 115, makecol(0, 0, 0));
 	
 	for(int i = 0; i < size; i++)
 	{

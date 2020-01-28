@@ -25,19 +25,19 @@ typedef gsl_matrix Matrix;
 
 void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
-void lin_model(double* u, double* x, double yaw_sp);
+void lin_model(double* u, double* x, double dt);
 
-void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d);
+void pid_rpy_alt_control(double* e, double* e_prev, double dt, double* u, double* p, double* d);
 
-void pid_xy_control(double* e, double* e_prev, double* vel_sp, double* p, double* d);
+void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d);
 
-void pid_vel_control(double* e, double* e_prev, double* rp_sp, double* p, double* d);
+void pid_vel_control(double* e, double* e_prev, double dt, double* rp_sp, double* p, double* d);
 
 void rotate_error(double* e, double yaw);
 
 void pid_control(double* e, double* e_prev, double* u, double yaw);
 
-void compute_setpoint(double* sp, WPoint* wp, double* pose, double alt, int wp_size, int* wp_flags);
+void next_setpoint(double* sp, WPoint* wp, int wp_size, int* wp_flags);
 
 void dlqr_control(Vector* sp, Vector* x, Matrix* K, Vector* u, double yaw);
 

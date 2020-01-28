@@ -36,7 +36,7 @@ double e_tmp[3] = {0.0};
 	
 	e[0] = e_tmp[0] * cos(yaw) + e_tmp[1] * sin(yaw);
 	e[1] = - e_tmp[0] * sin(yaw) + e_tmp[1] * cos(yaw);
-	
+	e[2] = e[2];
 	//printf("e0:%f, e1:%f\n", e[0], e[1]);
 }
 
@@ -61,7 +61,7 @@ double compute_pos_dist(double* v1, double* v2)
  * ---------------------------
  * Gets the next waypoint in the vector
  */
-void compute_setpoint(double* sp, WPoint* wp, double* pose, double alt, int wp_size, int* wp_flags)
+void next_setpoint(double* sp, WPoint* wp, int wp_size, int* wp_flags)
 {
 	
 WPoint xy_setpoint;
@@ -81,7 +81,6 @@ WPoint xy_setpoint;
 	
 	sp[0] = xy_setpoint.x;
 	sp[1] = xy_setpoint.y;
-	sp[2] = alt;
 }
 
 
@@ -91,12 +90,15 @@ WPoint xy_setpoint;
  * Implements a simple PD controller for position
  * control
  */
-void pid_xy_control(double* e, double* e_prev, double* vel_sp, double* p, double* d)
+void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d)
 {
 	// X velocity
-	vel_sp[0] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);	
+	vel_sp[0] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / dt;
 	// Y velocity
-	vel_sp[1] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	vel_sp[1] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / dt;
+
+	// Vertical Thrust
+	u[3] = e[2] * p[2] + d[2] * (e[2] - e_prev[2]) / dt;
 }
 
 /* 
@@ -104,12 +106,12 @@ void pid_xy_control(double* e, double* e_prev, double* vel_sp, double* p, double
  * ---------------------------
  * Implements a simple P controller for velocity control
  */
-void pid_vel_control(double* e, double* e_prev, double* rp_sp, double* p, double* d)
+void pid_vel_control(double* e, double* e_prev, double dt, double* rp_sp, double* p, double* d)
 {
 	// roll
-	rp_sp[0] = e[1] * p[6] + d[6] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	rp_sp[0] = e[1] * p[6] + d[6] * (e[1] - e_prev[1]) / dt;
 	// pitch
-	rp_sp[1] = e[0] * p[7] + d[7] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
+	rp_sp[1] = e[0] * p[7] + d[7] * (e[0] - e_prev[0]) / dt;
 }
 
 
@@ -119,17 +121,17 @@ void pid_vel_control(double* e, double* e_prev, double* rp_sp, double* p, double
  * Implements a PD control that gives the control 
  * outputs to the system: RPY torques and vertical thrust
  */
-void pid_rpy_alt_control(double* e, double* e_prev, double* u, double* p, double* d)
+void pid_rpy_alt_control(double* e, double* e_prev, double dt, double* u, double* p, double* d)
 {
 	// tau roll
-	u[0] = e[0] * p[3] + d[3] * (e[0] - e_prev[0]) / (TP_MODEL / 1000.0);
+	u[0] = e[0] * p[3] + d[3] * (e[0] - e_prev[0]) / dt;
 	// tau pitch
-	u[1] = e[1] * p[4] + d[4] * (e[1] - e_prev[1]) / (TP_MODEL / 1000.0);
+	u[1] = e[1] * p[4] + d[4] * (e[1] - e_prev[1]) / dt;
 	// tau yaw
-	u[2] = e[2] * p[5] + d[5] * (e[2] - e_prev[2]) / (TP_MODEL / 1000.0);
+	u[2] = e[2] * p[5] + d[5] * (e[2] - e_prev[2]) / dt;
 	
 	// vertical thrust
-	u[3] = 0.0;
+	//u[3] = 0.0;
 }
 
 /* 
@@ -196,7 +198,7 @@ void quad_linear_model(Vector* u, Matrix* A, Matrix* B, Vector* x)
  * Before position integration the step is rotated in the
  * world frame to accumulate correctly
  */
-void lin_model(double* u, double* x, double yaw_sp)
+void lin_model(double* u, double* x, double dt)
 {
 	double X_old[SIZE_X] = {0.0};
 	double X_new[SIZE_X] = {0.0};
@@ -205,22 +207,22 @@ void lin_model(double* u, double* x, double yaw_sp)
 	memcpy(X_old, x, sizeof(double) * SIZE_X);
 
 	X_new[6] = X_old[6] + u[0] / Jxx;							// p
-	X_new[0] = X_old[0] + X_new[6] * (TP_MODEL / 1000.0); 		// roll
+	X_new[0] = X_old[0] + X_new[6] * dt; 		// roll
 	
 	X_new[7] = X_old[7] + u[1] / Jyy;							// q
-	X_new[1] = X_old[1] + X_new[7] * (TP_MODEL / 1000.0);		// pitch
+	X_new[1] = X_old[1] + X_new[7] * dt;		// pitch
 
 	X_new[8] = X_old[8] + u[2] / Jzz;							// r
-	X_new[2] = X_old[2] + X_new[8] * (TP_MODEL / 1000.0);		// yaw
+	X_new[2] = X_old[2] + X_new[8] * dt;		// yaw
 	
 	X_new[9] = X_old[9] + 9.81 * X_new[1];						// u
-	X_new[3] =  X_new[9] * (TP_MODEL / 1000.0);					// x
+	X_new[3] =  X_new[9] * dt;					// x
 
 	X_new[10] = X_old[10] + 9.81 * X_new[0];					// v
-	X_new[4] =  X_new[10] * (TP_MODEL / 1000.0);				// y
+	X_new[4] =  X_new[10] * dt;				// y
 
 	X_new[11] = X_old[11] + u[3] / M;							// w
-	X_new[5] = X_old[5] + X_new[11] * (TP_MODEL / 1000.0);		// z
+	X_new[5] = X_old[5] + X_new[11] * dt;		// z
 	
 	
 	xy_tmp[0] = X_new[3];
@@ -407,9 +409,7 @@ int mode = 0;
 		*turn_dir = 1;
 	else
 		*turn_dir = -1;
-	
-	printf("ad: %f\n", angle_diff);
-	
+
 	// Emergency avoidance mode
 	if(min_trace.d <= 0.6)
 	{

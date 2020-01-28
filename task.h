@@ -18,9 +18,7 @@
 
 /* --- Definitions --- */
 
-
-
-#define THREAD_MAX_NUM 8
+#define THREAD_MAX_NUM 6
 /* --- Project functions --- */
 
 struct task_par {

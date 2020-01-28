@@ -12,24 +12,24 @@ double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
 double arr_repulsive_forces[2] = {0.0};
 double arr_error[SIZE_X] = {0.0};
-double setpoint_rpy[2] = {0.0};
 double arr_sp_uvw[3] = {0.0};
+double yawref = 0.0;
 
-double prop_gains[SIZE_PID] = {0.0};
-double deriv_gains[SIZE_PID] = {0.0};
-double prop_gains_df[SIZE_PID] = {0.0};
-double deriv_gains_df[SIZE_PID] = {0.0};
+double P_gains[SIZE_PID] = {0.0};
+double D_gains[SIZE_PID] = {0.0};
+double P_gains_df[SIZE_PID] = {0.0};
+double D_gains_df[SIZE_PID] = {0.0};
 
 Trace arr_traces[N_BEAMS];
 Trace arr_old_traces[N_BEAMS];
 
 WPoint waypoints[5] = {{-9999}, {-9999}};
-int wp_selected = 0;
+
 Obstacle arr_obstacles[OBS_NUM];
 int avoid = 0;
 
-double altitude_sp = 0.0;
-double yawref = 0.0;
+double altitude_sp = 5;
+
 WPoint target = {-9999, -9999};
 
 int collision = 0;
@@ -67,54 +67,53 @@ char scan;
 /* Semaphores */
 
 pthread_mutex_t mux_forces;
-pthread_mutex_t mux_rep_forces;
+pthread_mutex_t mux_vel_avoid;
 pthread_mutex_t mux_state;
 pthread_mutex_t mux_gfx;
 pthread_mutex_t mux_points;
 pthread_mutex_t mux_laser;
 pthread_mutex_t mux_rpy_sp;
 pthread_mutex_t mux_gains;
+pthread_mutex_t mux_alt;
 
 pthread_mutexattr_t muxattr;
 
 /* tasks  declaration */
-void* plan_task (void* arg);
-void* pidxy_task (void* arg);
 void* lin_model_task (void* arg);
 void* key_task (void* arg);
 void* gfx_task (void* arg);
 void* plt_task (void* arg);
 void* laser_task (void* arg);
 void* point_task (void* arg);
-void* gains_task (void* arg);
 
 /* main thread */
 
 int main (int argc, char **argv) 
 {
 
-struct sched_param sched_mod, sched_gfx, sched_lqr, sched_pnt, sched_plan;
-struct sched_param sched_plt, sched_key, sched_lsr, sched_gains;
+struct sched_param sched_mod, sched_gfx, sched_pnt;
+struct sched_param sched_plt, sched_key, sched_lsr;
 
-struct task_par tp_mod, tp_gfx, tp_lqr, tp_plt, tp_plan;
-struct task_par tp_key, tp_lsr, tp_pnt, tp_gains;
+struct task_par tp_mod, tp_gfx, tp_plt;
+struct task_par tp_key, tp_lsr, tp_pnt;
 
-pthread_attr_t attr_mod, attr_gfx, attr_lqr, attr_plt, attr_plan;
-pthread_attr_t attr_key, attr_lsr, attr_pnt, attr_gains;
+pthread_attr_t attr_mod, attr_gfx, attr_plt;
+pthread_attr_t attr_key, attr_lsr, attr_pnt;
 
-pthread_t tid_mod, tid_gfx, tid_lqr, tid_plt, tid_plan; 
-pthread_t tid_key, tid_lsr, tid_pnt, tid_gains;
+pthread_t tid_mod, tid_gfx, tid_plt; 
+pthread_t tid_key, tid_lsr, tid_pnt;
 
 int ret = 0;
 
 	mutex_create (mux_forces, muxattr, 0, 100);
-	mutex_create (mux_rep_forces, muxattr, 0, 100);
+	mutex_create (mux_vel_avoid, muxattr, 0, 100);
 	mutex_create (mux_state, muxattr, 0, 100);
 	mutex_create (mux_points, muxattr, 0, 100);
 	mutex_create (mux_gfx, muxattr, 0, 100);
 	mutex_create (mux_laser, muxattr, 0, 100);
 	mutex_create (mux_rpy_sp, muxattr, 0, 100);
 	mutex_create (mux_gains, muxattr, 0, 100);
+	mutex_create (mux_alt, muxattr, 0, 100);
 	
 	pthread_mutexattr_destroy (&muxattr);
 	
@@ -140,25 +139,19 @@ int ret = 0;
 	ret = thread_create (&tp_mod, &sched_mod, attr_mod, &tid_mod, lin_model_task);
 	thread_periods[3] = TP_MODEL;
 
-	//Create Planning Thread
-	set_task_params(&tp_plan, 4, TP_PLAN, TP_PLAN, 19);
-	ret = thread_create (&tp_plan, &sched_plan, attr_plan, &tid_plan, plan_task);
-	thread_periods[4] = TP_PLAN;	
-
 	//Create Laser scan Thread
 	set_task_params(&tp_lsr, 6, TP_LSR, TP_LSR, 16);
 	ret = thread_create (&tp_lsr, &sched_lsr, attr_lsr, &tid_lsr, laser_task);
-	thread_periods[5] = TP_LSR;
+	thread_periods[4] = TP_LSR;
 
 	//Create Plotting Thread
 	set_task_params(&tp_plt, 7, TP_PLOTS, TP_PLOTS, 5);
 	ret = thread_create (&tp_plt, &sched_plt, attr_plt, &tid_plt, plt_task);
-	thread_periods[6] = TP_PLOTS;
+	thread_periods[5] = TP_PLOTS;
 
 	
 	pthread_join (tid_pnt, NULL);
 	pthread_join (tid_lsr, NULL);
-	pthread_join (tid_plan, NULL);
 	pthread_join (tid_plt, NULL);
 	pthread_join (tid_mod, NULL);
 	pthread_join (tid_key, NULL);
@@ -172,22 +165,17 @@ int ret = 0;
 	pthread_mutex_destroy(&mux_state);
 	pthread_mutex_destroy(&mux_laser);
 	pthread_mutex_destroy(&mux_gfx);
-	pthread_mutex_destroy(&mux_rep_forces);
+	pthread_mutex_destroy(&mux_vel_avoid);
+	pthread_mutex_destroy(&mux_alt);
 
 	return 0;
 
 }
 
-void* plan_task(void* arg)
-{
-	struct task_par* tp;
-}
-
 void* lin_model_task(void* arg)
 {
 struct task_par* tp;
-gsl_matrix* A = gsl_matrix_calloc(SIZE_X, SIZE_X);
-gsl_matrix* B = gsl_matrix_calloc(SIZE_X, SIZE_U);
+
 double forces[SIZE_U] = {0.0};
 double state[SIZE_X] = {0.0};
 
@@ -195,16 +183,16 @@ int wp_flags[MAX_WPOINTS] = {0};
 int wp_idx = 1;
 double dist = 0.0;
 
-double error_xy[3] = {0.0};
-double error_xy_old[3] = {0.0};
+double error_xyz[3] = {0.0};
+double error_xyz_old[3] = {0.0};
 double error_vel[3] = {0.0};
 double error_vel_old[3] = {0.0};
 double error_rpy[3] = {0.0};
 double error_rpy_old[3] = {0.0};
 double setpoint_rpy[3] = {0.0};
-double setpoint_xy[3] = {0.0};
+double setpoint_xyz[3] = {0.0};
 double setpoint_uvw[3] = {0.0};
-double xy[3] = {0.0};
+double xyz[3] = {0.0};
 double uvw[3] = {0.0};
 double rpy[3] = {0.0};
 double rep_forces[2] = {0.0};
@@ -214,7 +202,7 @@ double total_forces[SIZE_U] = {0.0};
 	
 	set_period (tp);
 	
-	init_gains(prop_gains, deriv_gains, prop_gains_df, deriv_gains_df);
+	init_gains(P_gains, D_gains, P_gains_df, D_gains_df);
 	
 	do{
 		if (deadline_miss (tp))
@@ -231,10 +219,10 @@ double total_forces[SIZE_U] = {0.0};
 		state[3] = (waypoints[0].x - ENV_OFFSET_X) / ENV_SCALE;
 		state[4] = (ENV_OFFSET_Y - waypoints[0].y) / ENV_SCALE;
 		state[5] = 0;
-		compute_setpoint(setpoint_xy, waypoints, state, altitude_sp, waypoints_num, wp_flags);
-		setpoint_rpy[2] = atan2(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
-		target.x = setpoint_xy[0];
-		target.y = setpoint_xy[1];
+		next_setpoint(setpoint_xyz, waypoints, waypoints_num, wp_flags);
+		setpoint_rpy[2] = atan2(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
+		target.x = setpoint_xyz[0];
+		target.y = setpoint_xyz[1];
 		yawref = setpoint_rpy[2];
 		memcpy(arr_state, state, sizeof(double) * SIZE_X);
 		printf("Dynamic model task started\n");
@@ -242,10 +230,10 @@ double total_forces[SIZE_U] = {0.0};
 	
     do{
 		for(int i = 0; i < 3; i++) rpy[i] = state[i];
-		for(int i = 0; i < 3; i++) xy[i] = state[i + 3];
+		for(int i = 0; i < 3; i++) xyz[i] = state[i + 3];
 		for(int i = 0; i < 3; i++) uvw[i] = state[i + 9];
 
-		dist = compute_pos_dist(setpoint_xy, xy);
+		dist = compute_pos_dist(setpoint_xyz, xyz);
 		
 		if(dist <= 0.15 && wp_idx >= waypoints_num)
 		{
@@ -256,32 +244,40 @@ double total_forces[SIZE_U] = {0.0};
 			printf("Waypoint %d reached\n", wp_idx);
 			wp_flags[wp_idx] = 1;
 			wp_idx++;
-			compute_setpoint(setpoint_xy, waypoints, state, altitude_sp, waypoints_num, wp_flags);
-			setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
-			wp_selected = 1;
-			target.x = setpoint_xy[0];
-			target.y = setpoint_xy[1];
+			next_setpoint(setpoint_xyz, waypoints, waypoints_num, wp_flags);
+			setpoint_rpy[2] = atan2_safe(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
+			target.x = setpoint_xyz[0];
+			target.y = setpoint_xyz[1];
 			yawref = setpoint_rpy[2];
 		}
+		
+		// Copy altitude setpoint in case it has changed
+		pthread_mutex_lock(&mux_alt);
+		setpoint_xyz[2] = altitude_sp;
+		pthread_mutex_unlock(&mux_alt);
 
 		pthread_mutex_lock(&mux_gains);
 		
 		// [OUTER LOOP] POSITION/VELOCITY PID CONTROL
 		if (avoid == 0)
 		{
-			compute_error(setpoint_xy, xy, error_xy, error_xy_old, 3);
-			rotate_error(error_xy, rpy[2]);
-			pid_xy_control(error_xy, error_xy_old, setpoint_uvw, prop_gains, deriv_gains);
+			compute_error(setpoint_xyz, xyz, error_xyz, error_xyz_old, 3);
+			rotate_error(error_xyz, rpy[2]);
+			pid_xyz_control(error_xyz, error_xyz_old, 
+						   tp->period / 1000.0, forces, setpoint_uvw, P_gains, D_gains);
+			
 			compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
-			pid_vel_control(error_vel, error_vel_old, setpoint_rpy, prop_gains, deriv_gains);
+			pid_vel_control(error_vel, error_vel_old, 
+							tp->period / 1000.0, setpoint_rpy, P_gains, D_gains);
 		}
 		else
 		{
-			pthread_mutex_lock(&mux_rep_forces);
+			pthread_mutex_lock(&mux_vel_avoid);
 			memcpy(setpoint_uvw, arr_sp_uvw, sizeof(double) * 3);
-			pthread_mutex_unlock(&mux_rep_forces);
+			pthread_mutex_unlock(&mux_vel_avoid);
 			compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
-			pid_vel_control(error_vel, error_vel_old, setpoint_rpy, prop_gains, deriv_gains);
+			pid_vel_control(error_vel, error_vel_old, 
+							tp->period / 1000.0, setpoint_rpy, P_gains, D_gains);
 		}
 		
 		// [INNER LOOP] ROLL PITCH YAW PID CONTROL
@@ -289,19 +285,24 @@ double total_forces[SIZE_U] = {0.0};
 		error_rpy[2] = anglediff_safe(setpoint_rpy[2], rpy[2]);
 
 		if (avoid  == 0)
-			setpoint_rpy[2] = atan2_safe(setpoint_xy[1] - state[4], setpoint_xy[0] - state[3]);
+			setpoint_rpy[2] = atan2_safe(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
 		else
 			setpoint_rpy[2] = yawref;
 		
-		pid_rpy_alt_control(error_rpy, error_rpy_old, forces, prop_gains, deriv_gains);
+		pid_rpy_alt_control(error_rpy, error_rpy_old, 
+							tp->period / 1000.0, forces, P_gains, D_gains);
+		
 		pthread_mutex_unlock(&mux_gains);
 		
-		lin_model(forces, state, yawref);
+		// APPLY FORCES TO LINEAR SYSTEM
+		lin_model(forces, state, tp->period / 1000.0);
 		
 		pthread_mutex_lock(&mux_state);
 		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
 		memcpy(arr_state, state, sizeof(double) * SIZE_X);
 		pthread_mutex_unlock(&mux_state);
+		
+		printf("sp:%f ,Z:%f e:%f\n", setpoint_xyz[2], state[5], error_xyz[2]);
 		
 		// Save forces to plot
 		pthread_mutex_lock(&mux_forces);
@@ -322,10 +323,6 @@ double total_forces[SIZE_U] = {0.0};
 
 	}while(!end_sim && collision == 0);
 	
-	// free memory allocated for GSL variables
-	gsl_matrix_free(A);
-	gsl_matrix_free(B);
-
     printf("model task closed\n");
     
 	pthread_exit(0);
@@ -345,9 +342,6 @@ double old_state[SIZE_X] = {0.0};
 double state[SIZE_X] = {0.0};
 int mode = 0;
 int avoid_orientation = 0;
-
-
-Trace min_beam = {.x = 0.0, .y = 0.0, .z = 0.0};
 	
 	tp = (struct task_par *)arg;
 	set_period (tp);	
@@ -366,7 +360,7 @@ Trace min_beam = {.x = 0.0, .y = 0.0, .z = 0.0};
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
-		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
+		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 
 	}while(!start_sim && !end_sim);
     
@@ -407,7 +401,7 @@ Trace min_beam = {.x = 0.0, .y = 0.0, .z = 0.0};
 			printf ("DEADLINE MISS: lsr_task()\n");
 		
 		wait_for_period (tp);
-		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
+		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 		
 	}while(!end_sim && collision == 0);
 
@@ -445,7 +439,7 @@ BITMAP* expl;
 	
 	for(int i = 0; i < MAX_WPOINTS; i++)
 	{
-		curr_waypoints[i].x= -9999;
+		curr_waypoints[i].x= -9999; 
 		curr_waypoints[i].y = -9999;
 	}
 
@@ -472,23 +466,23 @@ BITMAP* expl;
 	show_mouse(buffer_gfx);
 	
 	do{
+		pthread_mutex_lock(&mux_points);
 		scare_mouse();
 		draw_obstacles(buffer_gfx, arr_obstacles, OBS_NUM, COL_GREEN);
 		
-		pthread_mutex_lock(&mux_points);
 		memcpy(old_waypoints, curr_waypoints, sizeof(WPoint) * MAX_WPOINTS);
 		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * MAX_WPOINTS);
 		draw_waypoints(buffer_gfx, old_waypoints, curr_waypoints, waypoints_num);
-		pthread_mutex_unlock(&mux_points);
+		
 
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
-		draw_gains(buffer_gfx, prop_gains, deriv_gains, key_mode);
+		draw_gains(buffer_gfx, P_gains, D_gains, key_mode);
 		
-		pthread_mutex_lock(&mux_gfx);		
+		pthread_mutex_lock(&mux_gfx);
 		blit(buffer_gfx,screen, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
-
 		pthread_mutex_unlock(&mux_gfx);
-		unscare_mouse();		
+		pthread_mutex_unlock(&mux_points);
+		unscare_mouse();
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: gfx_task()\n");
 
@@ -511,7 +505,7 @@ BITMAP* expl;
 		
 		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
-		draw_gains(buffer_gfx, prop_gains, deriv_gains, key_mode);
+		draw_gains(buffer_gfx, P_gains, D_gains, key_mode);
 		
 		if (collision)
 		{
@@ -582,7 +576,7 @@ double new_forces[SIZE_U] = {0.0};
 		
 		wait_for_period (tp);
 		
-		eval_period(tp, thread_periods, &selected_thread, 6, &tp_changed);
+		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 		
 	}while(!start_sim && !end_sim);
     
@@ -608,27 +602,14 @@ double new_forces[SIZE_U] = {0.0};
     
 		pthread_mutex_lock(&mux_gfx);
 					
-		rectfill(buffer_gfx, PLT_11_XCOORD - 99, PLT_11_YCOORD - 99, 
-				 PLT_11_XCOORD - 1, PLT_11_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, PLT_21_XCOORD - 99, PLT_21_YCOORD - 99, 
-				 PLT_11_XCOORD - 1, PLT_11_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, PLT_31_XCOORD - 99, PLT_11_YCOORD - 99, 
-				 PLT_31_XCOORD - 1, PLT_31_YCOORD - 1, makecol(0,0,0));
 		update_plot(buffer_gfx, plt_buf_tauX, PLT_11_XCOORD, PLT_11_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_tauY, PLT_21_XCOORD, PLT_21_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_tauZ, PLT_31_XCOORD, PLT_31_YCOORD, 1e2);
 		
-		rectfill(buffer_gfx, PLT_12_XCOORD - 99, PLT_12_YCOORD - 99, 
-				 PLT_12_XCOORD - 1, PLT_12_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, PLT_22_XCOORD - 99, PLT_22_YCOORD - 99,
-				 PLT_22_XCOORD - 1, PLT_22_YCOORD - 1, makecol(0,0,0));
-		rectfill(buffer_gfx, PLT_32_XCOORD - 99, PLT_32_YCOORD - 99, 
-				 PLT_32_XCOORD - 1, PLT_32_YCOORD - 1, makecol(0,0,0));
 		update_plot(buffer_gfx, plt_buf_Roll, PLT_12_XCOORD, PLT_12_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_Pitch, PLT_22_XCOORD, PLT_22_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_Z, PLT_32_XCOORD , PLT_32_YCOORD, 1);
 
-		
 		pthread_mutex_unlock(&mux_gfx);
 
 		if (deadline_miss (tp))
@@ -636,7 +617,7 @@ double new_forces[SIZE_U] = {0.0};
 
 		wait_for_period(tp);
 
-		eval_period(tp, thread_periods, &selected_thread, 6, &tp_changed);
+		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 
 	}while(!end_sim);
 	
@@ -670,9 +651,9 @@ struct task_par* tp;
 	
 	do{
 		
+		
 		draw_msg(buffer_gfx, waypoints_num + 5, WIDTH_SCREEN - 100,  HEIGHT_SCREEN/2 + 50);
-		
-		
+	
 		if(Lmouse_clicked)
 		{
 			//printf("L clicked\n");
@@ -690,7 +671,7 @@ struct task_par* tp;
 			pthread_mutex_unlock(&mux_points);
 			pthread_mutex_unlock(&mux_gfx);
 		}
-		
+
 		Lmouse_clicked = 0;
 		Rmouse_clicked = 0;
 
@@ -740,7 +721,7 @@ struct task_par* tp;
 
 		if(key[KEY_SPACE])
 		{
-			start_sim = 1;
+			if (waypoints_num >= 1) start_sim = 1;
 			key_mode = 0;
 		}
 
@@ -759,11 +740,7 @@ struct task_par* tp;
 					tp_changed = 0;
 				}
 			}
-			else if (key_mode >= 2)
-			{	
-				printf("Q coeff: %lf - R coeff: %lf\n", Q_coeff, R_coeff);
-				QR_changed = 1;
-			}
+
 			key_mode = 0;
 		}
 		
@@ -892,9 +869,19 @@ struct task_par* tp;
 				key_mode = 10;
 			}
 		}
+		
+		if(key[KEY_L])
+		{
+			if(key_mode != 11)
+			{
+				cancel_thread_tp(&selected_thread, thread_periods, &sel_thread_old_tp);
+				key_mode = 11;
+			}
+		}
+		
 		if(key[KEY_C])
 		{
-			reset_gains(prop_gains, deriv_gains, prop_gains_df, deriv_gains_df);
+			reset_gains(P_gains, D_gains, P_gains_df, D_gains_df);
 			key_mode = 0;
 		}
 		
@@ -909,11 +896,17 @@ struct task_par* tp;
 		{
 			if(key_mode == 1)
 				modify_thread_tp(&selected_thread, thread_periods, 10);
-			else if(key_mode > 1)
+			else if(key_mode > 1 && key_mode < 11)
 			{
 				pthread_mutex_lock(&mux_gains);
-				adjust_gain(prop_gains, deriv_gains, key_mode, 0);
+				adjust_gain(P_gains, D_gains, key_mode, 0);
 				pthread_mutex_unlock(&mux_gains);
+			}
+			else if(key_mode == 11)
+			{
+				pthread_mutex_lock(&mux_alt);
+				altitude_sp = altitude_sp * 1.2;
+				pthread_mutex_unlock(&mux_alt);
 			}
 		}
 		
@@ -921,11 +914,17 @@ struct task_par* tp;
 		{
 			if(key_mode == 1)
 				modify_thread_tp(&selected_thread, thread_periods, -10);
-			else if(key_mode > 1)
+			else if(key_mode > 1 && key_mode < 11)
 			{
 				pthread_mutex_lock(&mux_gains);
-				adjust_gain(prop_gains, deriv_gains, key_mode, 1);
+				adjust_gain(P_gains, D_gains, key_mode, 1);
 				pthread_mutex_unlock(&mux_gains);
+			}
+			else if(key_mode == 11)
+			{
+				pthread_mutex_lock(&mux_alt);
+				altitude_sp = altitude_sp * 0.8;
+				pthread_mutex_unlock(&mux_alt);
 			}
 		}
 		

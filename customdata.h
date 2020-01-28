@@ -5,9 +5,6 @@
 
 /* --- Project Constants --- */
 
-#define NT 4
-#define N_SAMPLES 2
-
 #define SIZE_X 12
 #define SIZE_U 4
 #define SIZE_Y 6
@@ -49,15 +46,13 @@
 #define PLT_31_XCOORD WIDTH_SCREEN - 120
 #define PLT_31_YCOORD HEIGHT_SCREEN - 5
 
+
 #define TP_GFX 33
 #define TP_PLOTS 80
 #define TP_LSR 30
 #define TP_MODEL 20
-#define TP_POS 10
-#define TP_PLAN 100
 #define TP_KEY 60
-#define TP_POINT 60
-#define TP_GAINS 200
+#define TP_POINT 120
 
 /* --- Project Structures --- */
 
