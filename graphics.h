@@ -18,7 +18,7 @@
 
 /* Graphics */
 
-void start_allegro(void);
+void start_allegro(int mode);
 
 void close_allegro(void);
 

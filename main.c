@@ -116,7 +116,7 @@ int ret = 0;
 	pthread_mutexattr_destroy (&muxattr);
 	
 	//Create Graphics Thread
-	start_allegro();
+	start_allegro(GFX_AUTODETECT_FULLSCREEN);
 	
 	set_task_params(&tp_gfx, 1, TP_GFX, TP_GFX, 7);
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
@@ -166,14 +166,15 @@ int ret = 0;
 	pthread_mutex_destroy(&mux_vel_avoid);
 	pthread_mutex_destroy(&mux_alt);
 	
-	printf("DEADLINE MISSES COUNT:\n");
-	printf("Model: %d\n", tp_mod.dmiss);
-	printf("Laser: %d\n", tp_lsr.dmiss);
-	printf("Graphics: %d\n", tp_gfx.dmiss);
-	printf("Waypoints: %d\n", tp_pnt.dmiss);
-	printf("Plotting: %d\n", tp_plt.dmiss);
-	printf("Keyboard: %d\n", tp_key.dmiss);
-	
+	printf("\nDEADLINE MISSES COUNT\n");
+	printf("---------------------\n");
+	printf("Model\t\t%d\n", tp_mod.dmiss);
+	printf("Laser\t\t%d\n", tp_lsr.dmiss);
+	printf("Graphics\t%d\n", tp_gfx.dmiss);
+	printf("Waypoints\t%d\n", tp_pnt.dmiss);
+	printf("Plotting\t%d\n", tp_plt.dmiss);
+	printf("Keyboard\t%d\n", tp_key.dmiss);
+
 	return 0;
 
 }

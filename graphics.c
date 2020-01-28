@@ -14,14 +14,14 @@
  * Function:Init allegro engine and screen
  * ---------------------------
  */
-void start_allegro (void)
+void start_allegro (int mode)
 {
 
 	allegro_init();
     
     set_color_depth(8);
     
-	set_gfx_mode (GFX_AUTODETECT_WINDOWED, WIDTH_SCREEN, HEIGHT_SCREEN, 0, 0);
+	set_gfx_mode (mode, WIDTH_SCREEN, HEIGHT_SCREEN, 0, 0);
     install_keyboard();
 	install_mouse();
 	
@@ -578,7 +578,7 @@ char text[20];
 	{
 		textout_centre_ex(bmp, font, "!!! Collision detected !!!", x, y,
 							makecol(0,0,0), makecol(255,0,0));
-		textout_centre_ex(bmp, font, "Press [ESC] to exit simulation", x + 5, y + 5,
+		textout_centre_ex(bmp, font, "Press [ESC] to exit simulation", x + 8, y + 8,
 							makecol(0,0,0), makecol(255,0,0));
 	}
 	else if(mode == 2)
