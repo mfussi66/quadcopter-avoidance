@@ -1,4 +1,11 @@
-/* Header File for RTS project */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+   MODEL and CONTROL HEADER
+ -------------------------- */
+
 
 /* --- Include guard --- */
 

@@ -1,4 +1,10 @@
-/* Function file for RTS Project */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+   MODEL and CONTROL SOURCE
+ -------------------------- */
 
 #include "model.h"
 
@@ -706,7 +712,7 @@ void init_gains(double* p, double* d, double* p_df, double* d_df)
 	// derivative gains
 	d[0] = 0;		// x
 	d[1] = 0;		// y
-	d[2] = 1e-3;	// z
+	d[2] = 6e-3;	// z
 	d[3] = 1e-3;	// roll
 	d[4] = 1e-3;	// pitch
 	d[5] = 8e-3;	// yaw
@@ -804,7 +810,8 @@ double res = sp - theta;
 
 double get_uniform_num()
 {
+double n = rand();
 	
-	return  rand() / RAND_MAX;
+	return n / RAND_MAX;
 	
 }

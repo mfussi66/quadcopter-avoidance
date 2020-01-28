@@ -1,4 +1,10 @@
-/* Function file for RTS Project */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+	    GRAPHICS SOURCE
+ -------------------------- */
 
 #include "graphics.h"
 
@@ -496,7 +502,7 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 	int x_prev = x;
 	int y_prev = y;
 	
-	rectfill(bmp, coord_x - 99, coord_y - 99, 
+	rectfill(bmp, coord_x - 100, coord_y - 100, 
 				coord_x - 1, coord_y - 1, makecol(0,0,0));
 	
 	for(int i = 0; i < PLT_DATA_SIZE; i++)
@@ -506,10 +512,10 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 		y = coord_y - (data[i] * scale) - PLT_FRAME_SIZE / 2;
 		
 		if (y <= (coord_y - PLT_FRAME_SIZE))
-			y = coord_y - PLT_FRAME_SIZE - 1;
+			y = coord_y - PLT_FRAME_SIZE + 1;
 		
 		if (y >= coord_y)
-			y = coord_y + 1;
+			y = coord_y - 1;
 		
 		if(getpixel(bmp, x_prev, y_prev) < 0) continue;
 		if(getpixel(bmp, x, y) < 0) continue;
@@ -541,6 +547,18 @@ char text[20];
 		else
 			textout_ex(bmp,font, text, 1239, 165 + 10 * i, COL_GREEN, -1);
 	}
+}
+
+void draw_altitude(BITMAP* bmp, double alt, double sp)
+{
+char text[30];
+	
+	sprintf(text, "[L] ALTITUDE %.2f - %.2f", sp, alt);
+	
+	rectfill(bmp, 1135, 130, 1361, 145, makecol(0, 0, 0));
+	
+	textout_ex(bmp,font, text, 1141, 135, COL_GREEN, -1);
+	
 }
 
 /* 

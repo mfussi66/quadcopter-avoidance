@@ -1,4 +1,10 @@
-/* --- REAL TIME MAIN --- */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+	     MAIN FILE
+ -------------------------- */
 
 #include "task.h"
 #include "model.h"
@@ -14,6 +20,7 @@ double arr_repulsive_forces[2] = {0.0};
 double arr_error[SIZE_X] = {0.0};
 double arr_sp_uvw[3] = {0.0};
 double yawref = 0.0;
+double altitude_sp = 5;
 
 double P_gains[SIZE_PID] = {0.0};
 double D_gains[SIZE_PID] = {0.0};
@@ -28,8 +35,6 @@ WPoint waypoints[5] = {{-9999}, {-9999}};
 Obstacle arr_obstacles[OBS_NUM];
 int avoid = 0;
 
-double altitude_sp = 5;
-
 WPoint target = {-9999, -9999};
 
 int collision = 0;
@@ -39,13 +44,6 @@ int gfx_enabled = 0;
 int key_enabled = 0;
 int key_mode = 0;
 int waypoints_num = -1;
-
-int QR_changed = 0;
-double Q_coeff = 1;
-double R_coeff = 1;
-
-double Q_coeff_old = 1;
-double R_coeff_old = 1;
 
 int tp_changed = 0;
 int selected_thread = 99;
@@ -167,7 +165,15 @@ int ret = 0;
 	pthread_mutex_destroy(&mux_gfx);
 	pthread_mutex_destroy(&mux_vel_avoid);
 	pthread_mutex_destroy(&mux_alt);
-
+	
+	printf("DEADLINE MISSES COUNT:\n");
+	printf("Model: %d\n", tp_mod.dmiss);
+	printf("Laser: %d\n", tp_lsr.dmiss);
+	printf("Graphics: %d\n", tp_gfx.dmiss);
+	printf("Waypoints: %d\n", tp_pnt.dmiss);
+	printf("Plotting: %d\n", tp_plt.dmiss);
+	printf("Keyboard: %d\n", tp_key.dmiss);
+	
 	return 0;
 
 }
@@ -212,6 +218,12 @@ double total_forces[SIZE_U] = {0.0};
 		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
 
 	}while(!start_sim && !end_sim);
+	
+	if(end_sim)
+	{
+		printf("model task closed\n");
+		pthread_exit(0);
+	}
 
 	if(start_sim)
 	{
@@ -301,8 +313,6 @@ double total_forces[SIZE_U] = {0.0};
 		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
 		memcpy(arr_state, state, sizeof(double) * SIZE_X);
 		pthread_mutex_unlock(&mux_state);
-		
-		printf("sp:%f ,Z:%f e:%f\n", setpoint_xyz[2], state[5], error_xyz[2]);
 		
 		// Save forces to plot
 		pthread_mutex_lock(&mux_forces);
@@ -474,6 +484,9 @@ BITMAP* expl;
 		memcpy(curr_waypoints, waypoints, sizeof(WPoint) * MAX_WPOINTS);
 		draw_waypoints(buffer_gfx, old_waypoints, curr_waypoints, waypoints_num);
 		
+		pthread_mutex_lock(&mux_alt);
+		draw_altitude(buffer_gfx, curr_pose[5], altitude_sp);
+		pthread_mutex_unlock(&mux_alt);
 
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
 		draw_gains(buffer_gfx, P_gains, D_gains, key_mode);
@@ -506,6 +519,10 @@ BITMAP* expl;
 		draw_waypoints(buffer_gfx, curr_waypoints, old_waypoints, waypoints_num);
 		draw_periods(buffer_gfx, thread_periods, THREAD_MAX_NUM, selected_thread);
 		draw_gains(buffer_gfx, P_gains, D_gains, key_mode);
+		
+		pthread_mutex_lock(&mux_alt);
+		draw_altitude(buffer_gfx, curr_pose[5], altitude_sp);
+		pthread_mutex_unlock(&mux_alt);
 		
 		if (collision)
 		{
@@ -608,7 +625,7 @@ double new_forces[SIZE_U] = {0.0};
 		
 		update_plot(buffer_gfx, plt_buf_Roll, PLT_12_XCOORD, PLT_12_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_Pitch, PLT_22_XCOORD, PLT_22_YCOORD, 1e3);
-		update_plot(buffer_gfx, plt_buf_Z, PLT_32_XCOORD , PLT_32_YCOORD, 1);
+		update_plot(buffer_gfx, plt_buf_Z, PLT_32_XCOORD , PLT_32_YCOORD, 3);
 
 		pthread_mutex_unlock(&mux_gfx);
 
@@ -905,7 +922,7 @@ struct task_par* tp;
 			else if(key_mode == 11)
 			{
 				pthread_mutex_lock(&mux_alt);
-				altitude_sp = altitude_sp * 1.2;
+				if(altitude_sp <= 1000) altitude_sp += 1;
 				pthread_mutex_unlock(&mux_alt);
 			}
 		}
@@ -923,7 +940,7 @@ struct task_par* tp;
 			else if(key_mode == 11)
 			{
 				pthread_mutex_lock(&mux_alt);
-				altitude_sp = altitude_sp * 0.8;
+				if(altitude_sp > 0) altitude_sp -= 1;
 				pthread_mutex_unlock(&mux_alt);
 			}
 		}

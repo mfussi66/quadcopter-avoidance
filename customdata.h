@@ -1,4 +1,10 @@
-/* Data structures and constants definition */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+ COMMON CONSTANTS AND STRUCTS
+ -------------------------- */
 
 #ifndef CUSTOMDATA_H
 #define CUSTOMDATA_H
@@ -84,10 +90,5 @@ typedef struct
 	int start;
 	int end;
 } Valley;
-
-/* 
- * Function: Utility functions for angle conversion
- * ---------------------------
- */
 
 #endif /* CUSTOMDATA_H_INCLUDED */

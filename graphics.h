@@ -1,4 +1,10 @@
-/* Header File for RTS project */
+/* -------------------------- 
+	 REAL TIME SYSTEMS
+	 OBSTACLE AVOIDANCE
+	   Mattia Fussi
+	
+	    GRAPHICS HEADER
+ -------------------------- */
 
 /* --- Include guard --- */
 
@@ -43,6 +49,8 @@ void del_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size);
 
 void draw_gains(BITMAP* bmp, double* p, double* d, int sel);
+
+void draw_altitude(BITMAP* bmp, double alt, double sp);
 
 void draw_msg(BITMAP* bmp, int mode, int x, int y);
 
