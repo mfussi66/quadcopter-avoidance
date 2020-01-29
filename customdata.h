@@ -27,10 +27,12 @@
 #define OBS_NUM 6
 
 #define OFFSET_LASER 0
-#define N_BEAMS 9
+#define APERTURE 150
+#define N_BEAMS 15
+#define ANGLE_RES 10
 #define BEAM_DMIN 0.4
 #define BEAM_DMAX 5
-#define BEAM_DSTEP 0.01
+#define BEAM_DSTEP 0.02
 
 #define COL_GREEN 48
 

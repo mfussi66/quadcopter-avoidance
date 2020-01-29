@@ -3,7 +3,7 @@
 	 OBSTACLE AVOIDANCE
 	   Mattia Fussi
 	
-	    GRAPHICS SOURCE
+	  GRAPHICS SOURCE
  -------------------------- */
 
 #include "graphics.h"
@@ -517,8 +517,15 @@ void update_plot(BITMAP* bmp, double* data, int coord_x, int coord_y, double sca
 		if (y >= coord_y)
 			y = coord_y - 1;
 		
+		if (y_prev <= (coord_y - PLT_FRAME_SIZE))
+			y_prev = coord_y - PLT_FRAME_SIZE + 1;
+		
+		if (y_prev >= coord_y)
+			y_prev = coord_y - 1;
+		
 		if(getpixel(bmp, x_prev, y_prev) < 0) continue;
 		if(getpixel(bmp, x, y) < 0) continue;
+
 		fastline(bmp, x_prev, y_prev, x, y, COL_GREEN);
 		
 		x_prev = x;
@@ -587,12 +594,6 @@ char text[20];
 				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
 		textout_centre_ex(bmp, font, "Status: Reaching goal", x, y, COL_GREEN, -1);
 	}
-	else if(mode == 3)
-	{
-		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
-				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
-		textout_centre_ex(bmp, font, "Status: Avoiding", x, y, makecol(255, 165, 0), -1);
-	}
 	else if(mode == 4)
 	{
 		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
@@ -612,6 +613,15 @@ char text[20];
 		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
 				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
 		textout_centre_ex(bmp, font, "Press [SPACE] to start", x, y,COL_GREEN, -1);		
+	}
+	else if(mode > 9)
+	{
+		
+		sprintf(text, "Avoiding: MODE %d", mode - 9);
+		
+		rectfill(bmp, WIDTH_SCREEN - 260, y - 4, 
+				WIDTH_SCREEN - 5, y + 10, makecol(0,0,0));
+		textout_centre_ex(bmp, font, text, x, y, makecol(255, 165, 0), -1);
 	}
 	
 }

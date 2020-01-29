@@ -34,9 +34,9 @@ void quad_linear_model(Vector *u, Matrix *A, Matrix *B, Vector *x);
 
 void lin_model(double* u, double* x, double dt);
 
-void pid_rpy_alt_control(double* e, double* e_prev, double dt, double* u, double* p, double* d);
+void pid_rpy_control(double* e, double* e_prev, double dt, double* u, double* p, double* d);
 
-void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d);
+void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d, int avoid);
 
 void pid_vel_control(double* e, double* e_prev, double dt, double* rp_sp, double* p, double* d);
 
@@ -66,9 +66,9 @@ Trace get_shortest_beam(Trace* tr, double threshold);
 
 void compute_repulsive_force(Trace* tr, double* pose, double *rep_forces, double ampli_thr);
 
-int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir);
+int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir, int old_mode, int old_turn_dir);
 
-void compute_avoid_sp(double* pose, int mode, double *vel_sp, double *yaw_sp, int turn_dir);
+void compute_avoid_sp(double* pose, int rn, int mode, double *vel_sp, double *yaw_sp, int turn_dir);
 
 //int compute_avoid_sp(Trace* tr, double* pose, WPoint* target, double ampli_thr, double *vel_sp, double *yaw_sp);
 

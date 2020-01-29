@@ -96,13 +96,15 @@ WPoint xy_setpoint;
  * Implements a simple PD controller for position
  * control
  */
-void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d)
+void pid_xyz_control(double* e, double* e_prev, double dt, double* u, double* vel_sp, double* p, double* d, int avoid)
 {
-	// X velocity
-	vel_sp[0] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / dt;
-	// Y velocity
-	vel_sp[1] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / dt;
-
+	if(avoid == 0)
+	{
+		// X velocity
+		vel_sp[0] = e[0] * p[0]  + d[0] * (e[0] - e_prev[0]) / dt;
+		// Y velocity
+		vel_sp[1] = e[1] * p[1] + d[1] * (e[1] - e_prev[1]) / dt;
+	}
 	// Vertical Thrust
 	u[3] = e[2] * p[2] + d[2] * (e[2] - e_prev[2]) / dt;
 }
@@ -127,7 +129,7 @@ void pid_vel_control(double* e, double* e_prev, double dt, double* rp_sp, double
  * Implements a PD control that gives the control 
  * outputs to the system: RPY torques and vertical thrust
  */
-void pid_rpy_alt_control(double* e, double* e_prev, double dt, double* u, double* p, double* d)
+void pid_rpy_control(double* e, double* e_prev, double dt, double* u, double* p, double* d)
 {
 	// tau roll
 	u[0] = e[0] * p[3] + d[3] * (e[0] - e_prev[0]) / dt;
@@ -136,8 +138,6 @@ void pid_rpy_alt_control(double* e, double* e_prev, double dt, double* u, double
 	// tau yaw
 	u[2] = e[2] * p[5] + d[5] * (e[2] - e_prev[2]) / dt;
 	
-	// vertical thrust
-	//u[3] = 0.0;
 }
 
 /* 
@@ -272,28 +272,26 @@ void init_laser_scanner(Trace* tr, int n, double aperture, double* init_pose)
  */
 void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, double n)
 {
-	int angle = spread / (n);
-	int i = 0;
 	float d = BEAM_DMIN;
 	double yaw = pose[2];
 	Trace trace_mt = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
 	Trace trace_px = {.x = BEAM_DMAX, .y = BEAM_DMAX, .z = BEAM_DMAX};
 	
-	for (int a = angle - 90; a <= spread - 90; a += angle)
+	for (int i = 1; i <= N_BEAMS; i ++)
 	{	
 		d = BEAM_DMIN;
 		while(d <= BEAM_DMAX)
 		{
-			trace_mt.x = d * cos(deg2rad((double)a) + yaw);
-			trace_mt.y = d * sin(deg2rad((double)a) + yaw);
+			trace_mt.x = d * cos(deg2rad((double)ANGLE_RES * i) + yaw - M_PI/2);
+			trace_mt.y = d * sin(deg2rad((double)ANGLE_RES * i) + yaw - M_PI/2);
 
 			trace_px.x = ENV_OFFSET_X + ENV_SCALE * (pose[3] + trace_mt.x);
 			trace_px.y = ENV_OFFSET_Y - ENV_SCALE * (pose[4] + trace_mt.y);
 
-			tr[i].d = d;
-			tr[i].x = trace_mt.x;
-			tr[i].y = trace_mt.y;
-			tr[i].theta = deg2rad((double)a) + yaw;
+			tr[i-1].d = d;
+			tr[i-1].x = trace_mt.x;
+			tr[i-1].y = trace_mt.y;
+			tr[i-1].theta = deg2rad((double)ANGLE_RES * i) + yaw - M_PI/2;
 			
 			if (getpixel(bmp, (int)trace_px.x, (int)trace_px.y) == makecol(0, 255, 0))
 				break;
@@ -302,7 +300,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 		}
 		//printf("theta %d: %f\n",i,tr[i].theta);
 		//printf("%d a: %f (%.2lf, %.2lf)\n", i,rad2deg(atan2(tr[i].y, tr[i].x)), trace_px.x, trace_px.y);
-		if(i < n) i++;
+		//if(i < n) i++;
 	}
 	//printf("^^^^\n");
 }
@@ -316,6 +314,7 @@ void get_laser_distances(BITMAP* bmp, Trace* tr, double* pose, double spread, do
 Trace get_shortest_beam(Trace* tr, double threshold)
 {
 Trace force_max;
+int i_max = 0;
 double trace_min = BEAM_DMAX;
 force_max.x = 0.0;
 force_max.y = 0.0;
@@ -325,11 +324,17 @@ force_max.z = 0.0;
 	{
 		if(tr[i].d < trace_min)
 		{
-			memcpy(&force_max, &tr[i], sizeof(Trace));
+			
+			i_max = i;
  			trace_min = tr[i].d;
 		}
 	}
-
+	
+	force_max.d = tr[i_max].d;
+	force_max.x = tr[i_max].x;
+	force_max.y = tr[i_max].y;
+	force_max.theta = tr[i_max].theta;
+	
 	return force_max;
 }
 
@@ -387,7 +392,7 @@ double rep_force_body[3] = {0.0};
  * to the angle and amplitude of the shortest beam wrt to 
  * the drone
  */
-int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir)
+int set_avoid_mode(Trace* tr, double* pose, WPoint* target, int* turn_dir, int old_mode, int old_turn_dir)
 {
 int i_nearest = 0;
 double a_nearest = M_PI;
@@ -409,7 +414,9 @@ int mode = 0;
 		}
 	}
 	
-	angle_diff = min_trace.theta - pose[2];
+	angle_diff = anglediff_safe(min_trace.theta, pose[2]);
+	
+	//printf("min %d %f\n", i_nearest, rad2deg(angle_diff));
 	
 	if (angle_diff < 0)
 		*turn_dir = 1;
@@ -418,8 +425,25 @@ int mode = 0;
 
 	// Emergency avoidance mode
 	if(min_trace.d <= 0.6)
-	{
+	{	
 		return 1;
+	}
+
+	if(old_mode == 1 && min_trace.d < 1)
+	{	*turn_dir = old_turn_dir;
+		return 1;
+	}
+	
+	if(old_mode == 4 && min_trace.d < 1.5)
+	{
+		*turn_dir = old_turn_dir;
+		return 4;
+	}
+
+	if(old_mode == 3 && min_trace.d < 1.5)
+	{
+		*turn_dir = old_turn_dir;
+		return 3;
 	}
 	
 	// If the the goal is closer than the shortest beam
@@ -427,20 +451,20 @@ int mode = 0;
 	{
 		return 0;
 	}
-	
+		
 	// Sets the primary avoidance modes
-	if(min_trace.d <= 1)
+	if(old_mode == 0 && min_trace.d < 1)
 	{
 		// if the obstacle if more or less in front of the quadc.
-		if(fabs(angle_diff) <= deg2rad(30))
+		if(fabs(angle_diff) <= deg2rad(20))
 		{
-			//if(get_uniform_num() >= 0.5) {*turn_dir = 1;}
-			//else {*turn_dir = -1;}
-			return 1;
+			return 3;
 		}
 		// rotate 1
-		if(fabs(angle_diff) > deg2rad(30))
-			return 2;
+		else if(fabs(angle_diff) > deg2rad(20))
+		{
+			return 4;
+		}
 	}
 
 	return mode;
@@ -453,36 +477,27 @@ int mode = 0;
  * Sets the appropriate velocity setpoints to avoid 
  * obstacles according to the modes chosen
  */
-void compute_avoid_sp(double* pose, int mode, double *vel_sp, double *yaw_sp, int turn_dir)
+void compute_avoid_sp(double* pose, int rn, int mode, double *vel_sp, double *yaw_sp, int turn_dir)
 {
 double vel_rot[2] = {0.0};
 
-	if (mode == 2)
-	{	
-		//*yaw_sp = pose[2];
-		vel_rot[1] = turn_dir * 0.5;
-		vel_rot[0] = turn_dir * 0.5;
-		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
-		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
-		
-	}
-	else if (mode == 3)
-	{	
-		//*yaw_sp = pose[2];
-		vel_rot[1] = -0.3;
-		vel_rot[0] = -0.3;
-		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
-		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);		
+	if (mode == 4)
+	{	//*yaw_sp = pose[2];
+		vel_sp[1] = turn_dir * 0.3;
+		vel_sp[0] = 0.0;
 	}
 	else if(mode == 1)
 	{
-		*yaw_sp = pose[2];
-		vel_rot[1] = turn_dir * 0.3;
-		vel_rot[0] = 0.0;
-		vel_sp[0] = vel_rot[0] * cos(0) - vel_rot[1] * sin(0);
-		vel_sp[1] = vel_rot[0] * sin(0) + vel_rot[1] * cos(0);
+		//*yaw_sp = pose[2];
+		vel_sp[1] = turn_dir * 0.5;
+		vel_sp[0] = 0.0;
 	}
-	
+	else if(mode == 3)
+	{
+		*yaw_sp = pose[2];
+		vel_sp[1] = rn * 0.3;
+		vel_sp[0] = 0.0;
+	}	
 }
 
 /*
@@ -764,13 +779,13 @@ void reset_gains(double* p, double* d, double* p_df, double* d_df)
  */
 double deg2rad(double n)
 {
-	return n * M_PI / 180;	
+	return n * M_PI / 180.0;	
 }
 
 
 double rad2deg(double n)
 {
-	return n * 180 / M_PI;	
+	return n * 180.0 / M_PI;	
 }
 
 double pow2(double n)

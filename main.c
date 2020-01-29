@@ -116,7 +116,7 @@ int ret = 0;
 	pthread_mutexattr_destroy (&muxattr);
 	
 	//Create Graphics Thread
-	start_allegro(GFX_AUTODETECT_FULLSCREEN);
+	start_allegro(GFX_AUTODETECT_WINDOWED);
 	
 	set_task_params(&tp_gfx, 1, TP_GFX, TP_GFX, 7);
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
@@ -271,39 +271,35 @@ double total_forces[SIZE_U] = {0.0};
 
 		pthread_mutex_lock(&mux_gains);
 		
-		// [OUTER LOOP] POSITION/VELOCITY PID CONTROL
-		if (avoid == 0)
-		{
-			compute_error(setpoint_xyz, xyz, error_xyz, error_xyz_old, 3);
-			rotate_error(error_xyz, rpy[2]);
-			pid_xyz_control(error_xyz, error_xyz_old, 
-						   tp->period / 1000.0, forces, setpoint_uvw, P_gains, D_gains);
-			
-			compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
-			pid_vel_control(error_vel, error_vel_old, 
-							tp->period / 1000.0, setpoint_rpy, P_gains, D_gains);
-		}
-		else
+		if (avoid > 0 )
 		{
 			pthread_mutex_lock(&mux_vel_avoid);
 			memcpy(setpoint_uvw, arr_sp_uvw, sizeof(double) * 3);
 			pthread_mutex_unlock(&mux_vel_avoid);
-			compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
-			pid_vel_control(error_vel, error_vel_old, 
-							tp->period / 1000.0, setpoint_rpy, P_gains, D_gains);
-		}
+		}	
+		
+		// [1 OUTER LOOP] POSITION P CONTROL + ALTITUDE PD
+		compute_error(setpoint_xyz, xyz, error_xyz, error_xyz_old, 3);
+		rotate_error(error_xyz, rpy[2]);
+		pid_xyz_control(error_xyz, error_xyz_old, 
+						tp->period / 1000.0, forces, setpoint_uvw, P_gains, D_gains, avoid);
+		
+		// [2 OUTER LOOP] VELOCITY P CONTROL
+		compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
+		pid_vel_control(error_vel, error_vel_old, 
+						tp->period / 1000.0, setpoint_rpy, P_gains, D_gains);
+
 		
 		// [INNER LOOP] ROLL PITCH YAW PID CONTROL
 		compute_error(setpoint_rpy, rpy, error_rpy, error_rpy_old, 3);
 		error_rpy[2] = anglediff_safe(setpoint_rpy[2], rpy[2]);
 
-		if (avoid  == 0)
-			setpoint_rpy[2] = atan2_safe(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
-		else
+		if (avoid  == 3)
 			setpoint_rpy[2] = yawref;
+		else
+			setpoint_rpy[2] = atan2_safe(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
 		
-		pid_rpy_alt_control(error_rpy, error_rpy_old, 
-							tp->period / 1000.0, forces, P_gains, D_gains);
+		pid_rpy_control(error_rpy, error_rpy_old, tp->period / 1000.0, forces, P_gains, D_gains);
 		
 		pthread_mutex_unlock(&mux_gains);
 		
@@ -344,26 +340,24 @@ void* laser_task(void* arg)
 {
 struct task_par* tp;
 
-double aperture;
-int n_traces;
 Trace laser_traces[N_BEAMS];
 Trace old_traces[N_BEAMS];
 double initialpose[SIZE_Y] = {0.0};
 double old_state[SIZE_X] = {0.0};
 double state[SIZE_X] = {0.0};
 int mode = 0;
+int rand_n = -1;
+int old_mode = 0;
+int old_turn_dir = 0;
 int avoid_orientation = 0;
 	
 	tp = (struct task_par *)arg;
 	set_period (tp);	
-	
-	aperture = 153;
-	n_traces = N_BEAMS;
 
 	srand(time(NULL));
 		
-	init_laser_scanner(laser_traces, N_BEAMS, aperture, initialpose);
-	init_laser_scanner(old_traces, N_BEAMS, aperture, initialpose);
+	init_laser_scanner(laser_traces, N_BEAMS, APERTURE, initialpose);
+	init_laser_scanner(old_traces, N_BEAMS, APERTURE, initialpose);
 	
 	do{
 
@@ -387,23 +381,35 @@ int avoid_orientation = 0;
 		memcpy(old_traces, laser_traces, sizeof(Trace) * N_BEAMS);
 		
 		pthread_mutex_lock(&mux_gfx);
-		get_laser_distances(buffer_gfx, laser_traces, state, aperture, N_BEAMS);
+		get_laser_distances(buffer_gfx, laser_traces, state, APERTURE, N_BEAMS);
 		pthread_mutex_unlock(&mux_gfx);
 		
-		mode = set_avoid_mode(laser_traces, state, &target, &avoid_orientation);
+ 		mode = set_avoid_mode(laser_traces, state, &target, &avoid_orientation, old_mode, old_turn_dir);
 
 		if(mode > 0)
 		{
-			compute_avoid_sp(state, mode, arr_sp_uvw, &yawref, avoid_orientation);
-			draw_msg(buffer_gfx, 3, WIDTH_SCREEN - 100,  HEIGHT_SCREEN/2 + 50);
-			avoid = 1;
+			if(old_mode == 0 && mode == 1)
+			{
+				if(get_uniform_num() >= 0.5) {rand_n = 1;}
+				else {rand_n = -1;}
+			}
+			
+			compute_avoid_sp(state, rand_n, mode, arr_sp_uvw, &yawref, avoid_orientation);
+			draw_msg(buffer_gfx, 9 + mode, WIDTH_SCREEN - 100,  HEIGHT_SCREEN/2 + 50);
+			avoid = mode;
 		}
 		else
 		{
+			
 			draw_msg(buffer_gfx, 2, WIDTH_SCREEN - 100,  HEIGHT_SCREEN/2 + 50);
-			avoid = 0;
+			avoid = mode;
 		}
+		
+		printf("MODE %d\n", mode);
 
+		old_mode = mode;
+		old_turn_dir = avoid_orientation;
+		
 		pthread_mutex_lock(&mux_gfx);
 		draw_laser_traces(buffer_gfx, old_traces, laser_traces, old_state, state);
 		pthread_mutex_unlock(&mux_gfx);
@@ -624,8 +630,8 @@ double new_forces[SIZE_U] = {0.0};
 		update_plot(buffer_gfx, plt_buf_tauY, PLT_21_XCOORD, PLT_21_YCOORD, 1e3);
 		update_plot(buffer_gfx, plt_buf_tauZ, PLT_31_XCOORD, PLT_31_YCOORD, 1e2);
 		
-		update_plot(buffer_gfx, plt_buf_Roll, PLT_12_XCOORD, PLT_12_YCOORD, 1e3);
-		update_plot(buffer_gfx, plt_buf_Pitch, PLT_22_XCOORD, PLT_22_YCOORD, 1e3);
+		update_plot(buffer_gfx, plt_buf_Roll, PLT_12_XCOORD, PLT_12_YCOORD, 5e2);
+		update_plot(buffer_gfx, plt_buf_Pitch, PLT_22_XCOORD, PLT_22_YCOORD, 5e2);
 		update_plot(buffer_gfx, plt_buf_Z, PLT_32_XCOORD , PLT_32_YCOORD, 3);
 
 		pthread_mutex_unlock(&mux_gfx);
