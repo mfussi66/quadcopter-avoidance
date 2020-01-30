@@ -116,7 +116,7 @@ int ret = 0;
 	pthread_mutexattr_destroy (&muxattr);
 	
 	//Create Graphics Thread
-	start_allegro(GFX_AUTODETECT_WINDOWED);
+	start_allegro(GFX_AUTODETECT_FULLSCREEN);
 	
 	set_task_params(&tp_gfx, 1, TP_GFX, TP_GFX, 7);
 	ret = thread_create (&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
@@ -202,8 +202,11 @@ double setpoint_uvw[3] = {0.0};
 double xyz[3] = {0.0};
 double uvw[3] = {0.0};
 double rpy[3] = {0.0};
-double rep_forces[2] = {0.0};
-double total_forces[SIZE_U] = {0.0};
+char all_vals[100];
+
+// 	FILE *f_pointer;
+// 
+// 	f_pointer = fopen ("./xy.txt", "w");
 
 	tp = (struct task_par *)arg;
 	
@@ -306,6 +309,12 @@ double total_forces[SIZE_U] = {0.0};
 		// APPLY FORCES TO LINEAR SYSTEM
 		lin_model(forces, state, tp->period / 1000.0);
 		
+// 		sprintf(all_vals,"%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf\n",
+// 				state[0],state[1], state[2], state[3], state[4], state[5],
+// 				forces[0], forces[1], forces[2], forces[3]);
+// 		
+		//fputs (all_vals, f_pointer);
+			
 		pthread_mutex_lock(&mux_state);
 		memcpy(arr_old_state, arr_state, sizeof(double) * SIZE_X);
 		memcpy(arr_state, state, sizeof(double) * SIZE_X);
@@ -329,6 +338,8 @@ double total_forces[SIZE_U] = {0.0};
 		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
 
 	}while(!end_sim && collision == 0);
+	
+	//fclose (f_pointer);
 	
     printf("model task closed\n");
     
@@ -405,8 +416,6 @@ int avoid_orientation = 0;
 			avoid = mode;
 		}
 		
-		printf("MODE %d\n", mode);
-
 		old_mode = mode;
 		old_turn_dir = avoid_orientation;
 		

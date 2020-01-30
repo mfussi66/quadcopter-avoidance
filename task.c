@@ -267,20 +267,3 @@ void write_to_file (const char* filename, const char* text, int toappend)
 	return;
 
 }
-
-int read_matrix_file (const char* filename, gsl_matrix* M)
-{
-	FILE* ptr;
-	int ret = 0;
-	
-	ptr = fopen(filename, "rb");
-	
-	ret = gsl_matrix_fread(ptr, M);
-	
-	if (ret !=0)
-		printf("Error reading matrix file!\n");
-	
-	fclose(ptr);
-	
-	return ret;
-}

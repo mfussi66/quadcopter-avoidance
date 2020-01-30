@@ -12,9 +12,6 @@
 #include <semaphore.h>
 #include <time.h>
 #include <string.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_blas.h>
 
 /* --- Definitions --- */
 
@@ -65,7 +62,5 @@ int mutex_create (pthread_mutex_t mux, pthread_mutexattr_t matt, int prot, int c
 void shift_and_append (double *array, int size, double new_element);
 
 void write_to_file (const char* filename, const char* text, int toappend);
-
-int read_matrix_file (const char* filename, gsl_matrix* M);
 
 #endif /* TASK_H_INCLUDED_ */
