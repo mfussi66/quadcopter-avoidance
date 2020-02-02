@@ -13,52 +13,59 @@
 
 /* global vars */
 
+// Model vectors
 double arr_state[SIZE_X] = {0.0};
 double arr_old_state[SIZE_X] = {0.0};
 double arr_forces[SIZE_U] = {0.0}; 
-double arr_repulsive_forces[2] = {0.0};
-double arr_error[SIZE_X] = {0.0};
 double arr_sp_uvw[3] = {0.0};
 double yawref = 0.0;
 double altitude_sp = 5;
+WPoint waypoints[5] = {{-9999}, {-9999}};
+Obstacle arr_obstacles[OBS_NUM];
+WPoint target = {-9999, -9999};
 
+// Controller gains
 double P_gains[SIZE_PID] = {0.0};
 double D_gains[SIZE_PID] = {0.0};
 double P_gains_df[SIZE_PID] = {0.0};
 double D_gains_df[SIZE_PID] = {0.0};
 
+// Laser global variables
 Trace arr_traces[N_BEAMS];
 Trace arr_old_traces[N_BEAMS];
 
-WPoint waypoints[5] = {{-9999}, {-9999}};
-
-Obstacle arr_obstacles[OBS_NUM];
-int avoid = 0;
-
-WPoint target = {-9999, -9999};
-
+// Control flow flags
 int collision = 0;
 int gfx_initialized = 0;
 int key_initialized = 0;
 int gfx_enabled = 0;
 int key_enabled = 0;
 int key_mode = 0;
+int start_sim = 0;
+int end_sim = 0;
+int avoid = 0;
 int waypoints_num = -1;
 
+// Tasks periods editing variables
 int tp_changed = 0;
 int selected_thread = 99;
 int sel_thread_old_tp = 0;
 int thread_periods[THREAD_MAX_NUM] = {0};
 
-int start_sim = 0;
-int end_sim = 0;
-
+// Click handling
 int Lmouse_clicked = 0;
 int Rmouse_clicked = 0;
 WPoint Rmouse;
 WPoint Lmouse;
 
+// Graphics buffer to blit to screen
 BITMAP* buffer_gfx;
+
+// Variables used to time the tasks
+int timetaken[6] = {0};
+struct timespec t_0[6];
+struct timespec t_K_1[6];
+struct timespec t_K[6];
 
 char scan;
 
@@ -84,8 +91,11 @@ void* plt_task (void* arg);
 void* laser_task (void* arg);
 void* point_task (void* arg);
 
-/* main thread */
-
+/*
+ * Task: MAIN
+ * -----------------
+ * Main thread that spawns all the others
+ */
 int main (int argc, char **argv) 
 {
 
@@ -108,7 +118,6 @@ int ret = 0;
 	mutex_create (mux_state, muxattr, 0, 100);
 	mutex_create (mux_points, muxattr, 0, 100);
 	mutex_create (mux_gfx, muxattr, 0, 100);
-	mutex_create (mux_laser, muxattr, 0, 100);
 	mutex_create (mux_rpy_sp, muxattr, 0, 100);
 	mutex_create (mux_gains, muxattr, 0, 100);
 	mutex_create (mux_alt, muxattr, 0, 100);
@@ -161,24 +170,41 @@ int ret = 0;
 	pthread_mutex_destroy(&mux_rpy_sp);
 	pthread_mutex_destroy(&mux_forces);
 	pthread_mutex_destroy(&mux_state);
-	pthread_mutex_destroy(&mux_laser);
 	pthread_mutex_destroy(&mux_gfx);
 	pthread_mutex_destroy(&mux_vel_avoid);
 	pthread_mutex_destroy(&mux_alt);
 	
+
+	printf("\nPERIOD COUNTS\n");
+	printf("---------------------\n");
+	for(int i=0; i<6; i++)
+	{
+		printf("T%d T1:%ld T2:%ld\n",i, t_K_1[i].tv_nsec - t_0[i].tv_nsec, t_K[i].tv_nsec - t_K_1[i].tv_nsec);
+		
+	}
+	
 	printf("\nDEADLINE MISSES COUNT\n");
 	printf("---------------------\n");
-	printf("Model\t\t%d\n", tp_mod.dmiss);
+	printf("Model\t\t%d\n",tp_mod.dmiss);
 	printf("Laser\t\t%d\n", tp_lsr.dmiss);
 	printf("Graphics\t%d\n", tp_gfx.dmiss);
-	printf("Waypoints\t%d\n", tp_pnt.dmiss);
 	printf("Plotting\t%d\n", tp_plt.dmiss);
+	printf("Waypoints\t%d\n", tp_pnt.dmiss);
 	printf("Keyboard\t%d\n", tp_key.dmiss);
 
 	return 0;
 
 }
 
+
+/*
+ * Task: Linearized model and control
+ * -----------------
+ * Implements the equations of the linearized 
+ * quadcopter model, with the cascade regulators for control.
+ * Checks at the beginning of each iteration if the current
+ * goal has been reached.
+ */
 void* lin_model_task(void* arg)
 {
 struct task_par* tp;
@@ -244,7 +270,14 @@ char all_vals[100];
 		printf("Dynamic model task started\n");
 	}
 	
+	clock_gettime(CLOCK_MONOTONIC,&t_0[0]);
+	
     do{
+		
+		if (timetaken[0] == 0){clock_gettime(CLOCK_MONOTONIC,&t_K_1[0]);};
+		
+		printf("T%d T1:%ld\n",0, t_K_1[0].tv_nsec - t_0[0].tv_nsec);
+		
 		for(int i = 0; i < 3; i++) rpy[i] = state[i];
 		for(int i = 0; i < 3; i++) xyz[i] = state[i + 3];
 		for(int i = 0; i < 3; i++) uvw[i] = state[i + 9];
@@ -333,10 +366,13 @@ char all_vals[100];
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: model_task()\n");
+
+		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
+		
+		if (timetaken[0] == 0){clock_gettime(CLOCK_MONOTONIC,&t_K[0]); timetaken[0] = 1;};
 		
 		wait_for_period (tp);
-		eval_period(tp, thread_periods, &selected_thread, 3, &tp_changed);
-
+		
 	}while(!end_sim && collision == 0);
 	
 	//fclose (f_pointer);
@@ -347,6 +383,14 @@ char all_vals[100];
 
 }
 
+/*
+ * Task:Laser scanner and avoidance
+ * -----------------
+ * Used to compute the distances and draw the  
+ * traces of the laser scanner sensor. Also sets the
+ * avoidance modes according to the distance of the shortest
+ * beam
+ */
 void* laser_task(void* arg)
 {
 struct task_par* tp;
@@ -382,7 +426,13 @@ int avoid_orientation = 0;
     
     printf("Laser Scanner task started\n");
     
+	clock_gettime(CLOCK_MONOTONIC,&t_0[1]);
+	
 	do{
+		
+		if (timetaken[1] == 0){clock_gettime(CLOCK_MONOTONIC,&t_K_1[1]);};
+		
+		printf("T%d T1:%ld\n",1, t_K_1[1].tv_nsec - t_0[1].tv_nsec);
 		
 		pthread_mutex_lock(&mux_state);
 		memcpy(old_state, state, sizeof(double) * SIZE_X);
@@ -425,10 +475,13 @@ int avoid_orientation = 0;
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: lsr_task()\n");
-		
-		wait_for_period (tp);
+
 		eval_period(tp, thread_periods, &selected_thread, 4, &tp_changed);
 		
+		if (timetaken[1] == 0){clock_gettime(CLOCK_MONOTONIC,&t_K[1]); timetaken[1] = 1;};
+		
+		wait_for_period (tp);
+
 	}while(!end_sim && collision == 0);
 
     printf("Laser Scanner task closed\n");
@@ -440,8 +493,8 @@ int avoid_orientation = 0;
 /*
  * Task: Main graphics thread
  * -----------------
- * Used for drawing model
- * 
+ * Used To draw the static elements 
+ * and the quadcopter model
  */
 void* gfx_task(void* arg)
 {
@@ -523,7 +576,14 @@ BITMAP* expl;
 	
 	show_mouse(NULL);
 	
+	clock_gettime(CLOCK_MONOTONIC,&t_0[2]);
+	
 	do{
+		
+		if (timetaken[2] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K_1[2]);};
+		
+		printf("T%d T1:%ld\n",2, t_K_1[2].tv_nsec - t_0[2].tv_nsec);
+		
 		pthread_mutex_lock(&mux_state);		
 		memcpy(old_pose, curr_pose, sizeof(double) * SIZE_Y);
 		memcpy(curr_pose, arr_state, sizeof(double) * SIZE_Y);
@@ -556,10 +616,12 @@ BITMAP* expl;
 		
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: gfx_task()\n");
+
+		eval_period(tp, thread_periods, &selected_thread, 0, &tp_changed);
+
+		if (timetaken[2] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K[2]);timetaken[2] = 1;};
 		
 		wait_for_period (tp);
-		
-		eval_period(tp, thread_periods, &selected_thread, 0, &tp_changed);
         
 	}while(!end_sim);
 	
@@ -579,10 +641,10 @@ BITMAP* expl;
 }
 
 /*
- * Task
+ * Task: Plotting
  * -----------------
- * Used for plotting
- * 
+ * Used to updates plots of quantities that cannot
+ * be seen by the top-down view
  */
 void* plt_task(void* arg)
 {
@@ -615,8 +677,14 @@ double new_forces[SIZE_U] = {0.0};
     
     printf("Plotting task started\n");
 
+	clock_gettime(CLOCK_MONOTONIC, &t_0[3]);
+	
 	do{
-			
+	
+		if (timetaken[3] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K_1[3]);};
+		
+		printf("T%d T1:%ld\n",3, t_K_1[3].tv_nsec - t_0[3].tv_nsec);
+		
 		pthread_mutex_lock(&mux_state);
 		memcpy(new_pose, arr_state, sizeof(double) * SIZE_X);
 		pthread_mutex_unlock(&mux_state);
@@ -647,10 +715,14 @@ double new_forces[SIZE_U] = {0.0};
 
 		if (deadline_miss (tp))
 			printf ("DEADLINE MISS: plt_task()\n");
-
+		
+		
+		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
+		
+		if (timetaken[3] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K[3]);timetaken[3] = 1;};
+		
 		wait_for_period(tp);
 
-		eval_period(tp, thread_periods, &selected_thread, 5, &tp_changed);
 
 	}while(!end_sim);
 	
@@ -659,7 +731,7 @@ double new_forces[SIZE_U] = {0.0};
 
 
 /*
- * Task
+ * Task: waypoints
  * -----------------
  * Used to select waypoints
  * 
@@ -682,8 +754,13 @@ struct task_par* tp;
 
 	printf("Click on starting point\n");
 	
+	clock_gettime(CLOCK_MONOTONIC, &t_0[4]);
+	
 	do{
 		
+		if (timetaken[4] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K_1[4]);};
+		
+		printf("T%d T1:%ld\n",4, t_K_1[4].tv_nsec - t_0[4].tv_nsec);
 		
 		draw_msg(buffer_gfx, waypoints_num + 5, WIDTH_SCREEN - 100,  HEIGHT_SCREEN/2 + 50);
 	
@@ -711,10 +788,12 @@ struct task_par* tp;
 		if (deadline_miss(tp))
 			printf ("DEADLINE MISS: point_task()\n");
 
+		eval_period(tp, thread_periods, &selected_thread, 2, &tp_changed);
+				
+		if (timetaken[4] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K[4]);timetaken[4] = 1;};
+		
 		wait_for_period (tp);
 		
-		eval_period(tp, thread_periods, &selected_thread, 2, &tp_changed);
-
 	}while(!start_sim  && !end_sim);
 	
 	printf("Waypoints selection completed: found %d goals\n", waypoints_num);
@@ -726,7 +805,7 @@ struct task_par* tp;
 }
 
 /*
- * Task
+ * Task: keyboard
  * -----------------
  * Used for keyboard events
  * 
@@ -741,8 +820,14 @@ struct task_par* tp;
 	key_enabled = 1;
 
 	printf("Keyboard task started\n");
+	
+	clock_gettime(CLOCK_MONOTONIC, &t_0[5]);
 
 	do{
+		if (timetaken[5] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K_1[5]);};
+		
+		printf("T%d T1:%ld\n",5, t_K_1[5].tv_nsec - t_0[5].tv_nsec);
+		
 		scan = 0;
 		
 		// Check for pressed key
@@ -978,10 +1063,13 @@ struct task_par* tp;
 		}
 		
 		if (deadline_miss(tp))		
-		printf ("DEADLINE MISS: key_task()\n");
+			printf ("DEADLINE MISS: key_task()\n");
 
-		wait_for_period (tp);
 		eval_period(tp, thread_periods, &selected_thread, 1, &tp_changed);
+		
+		if (timetaken[5] == 0){clock_gettime(CLOCK_MONOTONIC, &t_K[5]);timetaken[5] = 1;};
+		
+		wait_for_period (tp);
 
 	}while(!end_sim);
 
