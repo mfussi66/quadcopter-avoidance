@@ -179,8 +179,9 @@ int ret = 0;
 	printf("---------------------\n");
 	for(int i=0; i<6; i++)
 	{
-		printf("T%d T1:%ld T2:%ld\n",i, t_K_1[i].tv_nsec - t_0[i].tv_nsec, t_K[i].tv_nsec - t_K_1[i].tv_nsec);
-		
+		printf("T%d T1:%ld T2:%ld\n",i, 
+				t_K_1[i].tv_nsec - t_0[i].tv_nsec, 
+				t_K[i].tv_nsec - t_K_1[i].tv_nsec);
 	}
 	
 	printf("\nDEADLINE MISSES COUNT\n");
