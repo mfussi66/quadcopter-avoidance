@@ -1026,6 +1026,7 @@ struct task_par* tp;
 				pthread_mutex_lock(&mux_alt);
 				if(altitude_sp <= 1000) altitude_sp += 1;
 				pthread_mutex_unlock(&mux_alt);
+				key_mode = 0;
 			}
 		}
 		
@@ -1044,6 +1045,7 @@ struct task_par* tp;
 				pthread_mutex_lock(&mux_alt);
 				if(altitude_sp > 0) altitude_sp -= 1;
 				pthread_mutex_unlock(&mux_alt);
+				key_mode = 0;
 			}
 		}
 		
