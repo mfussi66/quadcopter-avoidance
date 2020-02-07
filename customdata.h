@@ -87,10 +87,4 @@ typedef struct
 	double y;
 } WPoint;
 
-typedef struct
-{
-	int start;
-	int end;
-} Valley;
-
 #endif /* CUSTOMDATA_H_INCLUDED */
