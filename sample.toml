@@ -1,0 +1,14 @@
+[dynamics]
+    m = 0.42
+    jxx = 0.0099
+    jyy = 0.0099
+    jzz = 0.0189
+    
+[laser]
+    offset = 0
+    n_beams = 15
+    aperture_angle = 150 
+    angle_resolution = 10
+    beam_min_distance = 0.04
+    beam_max_distance = 5
+    beam_sense_step = 0.02

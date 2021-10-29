@@ -14,7 +14,7 @@ CC=gcc
 ## CFLAGS are the options passed to the compiler
 ##---------------------------------------
 
-CFLAGS= -Wall -std=c11 -lpthread -lrt -lm
+CFLAGS= -Wall -std=c11 -lpthread -lrt -lm -ltoml
 
 ##---------------------------------------
 ## OBJS are the object files to be linked
@@ -26,8 +26,9 @@ CFLAGS= -Wall -std=c11 -lpthread -lrt -lm
 OBJ1= task
 OBJ2= graphics
 OBJ3= model
+OBJ4= configure
 
-OBJS= $(MAIN).o $(OBJ1).o $(OBJ2).o $(OBJ3).o
+OBJS= $(MAIN).o $(OBJ1).o $(OBJ2).o $(OBJ3).o $(OBJ4).o
 
 ##---------------------------------------
 ## LIBS are the external libraries to be used
@@ -52,6 +53,9 @@ $(OBJ2).o: $(OBJ2).c
 
 $(OBJ3).o: $(OBJ3).c
 	$(CC) -c $(OBJ3).c
+
+$(OBJ4).o: $(OBJ4).c
+	$(CC) -c $(OBJ4).c
 	
 clean:
 	@rm -f $(MAIN) *.o

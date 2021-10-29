@@ -1,8 +1,8 @@
-/* -------------------------- 
-	 REAL TIME SYSTEMS
-	 OBSTACLE AVOIDANCE
-	   Mattia Fussi
-	
+/* --------------------------
+         REAL TIME SYSTEMS
+         OBSTACLE AVOIDANCE
+           Mattia Fussi
+
  COMMON CONSTANTS AND STRUCTS
  -------------------------- */
 
@@ -54,7 +54,6 @@
 #define PLT_31_XCOORD WIDTH_SCREEN - 120
 #define PLT_31_YCOORD HEIGHT_SCREEN - 5
 
-
 #define TP_GFX 33
 #define TP_PLOTS 80
 #define TP_LSR 30
@@ -64,27 +63,31 @@
 
 /* --- Project Structures --- */
 
-typedef struct
-{
-	double x;
-	double y;
-	double z;
-	double d;
-	double theta;
+typedef struct {
+  double x;
+  double y;
+  double z;
+  double d;
+  double theta;
 } Trace;
 
-typedef struct
-{
-	double x1;
-	double y1;
-	double x2;
-	double y2;
+typedef struct {
+  double x1;
+  double y1;
+  double x2;
+  double y2;
 } Obstacle;
 
-typedef struct
-{
-	double x;
-	double y;
+typedef struct {
+  double x;
+  double y;
 } WPoint;
 
-#endif /* CUSTOMDATA_H_INCLUDED */
+typedef struct {
+  double mass;
+  double J_xx;
+  double J_yy;
+  double J_zz;
+} DynParam;
+
+#endif // CUSTOMDATA_H

@@ -1,10 +1,5 @@
 .kdev4/
 main
-main.o
-task.o
-model.o
-graphics.o
-quadcopter-avoidance.kdev4
-bmp/quad2.jpg
-bmp/explosion-417894_960_720.png
+*.o
+*.kdev4
 TEMPI.md
