@@ -44,7 +44,7 @@ void draw_laser_points(BITMAP *bmp, Trace* old, Trace* new, double* old_pose, do
 
 void add_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
 
-void del_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
+void delete_waypoint(BITMAP* bmp, WPoint* array, int* num,  WPoint point);
 
 void draw_waypoints(BITMAP* bmp, WPoint* old_wpoints, WPoint* wpoints, int size);
 

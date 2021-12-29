@@ -88,6 +88,16 @@ typedef struct {
   double J_xx;
   double J_yy;
   double J_zz;
-} DynParam;
+} DynParams;
+
+typedef struct {
+  double offset;
+  double aperture;
+  int n_beams;
+  double angle_resolution;
+  double beam_distance_min;
+  double beam_distance_max;
+  double beam_sense_step;
+} LaserParams;
 
 #endif // CUSTOMDATA_H

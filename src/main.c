@@ -112,9 +112,9 @@ int main(int argc, char** argv) {
 
   int ret = 0;
   
-  DynParam p;
+  DynParams p;
   
-  ret = read_parameters("sample.toml", &p);
+  // ret = read_parameters("sample.toml", &p);
 
   mutex_create(mux_forces, muxattr, 0, 100);
   mutex_create(mux_vel_avoid, muxattr, 0, 100);
@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
   pthread_mutexattr_destroy(&muxattr);
 
   // Create Graphics Thread
-  start_allegro(GFX_AUTODETECT_FULLSCREEN);
+  start_allegro(GFX_AUTODETECT);
 
   set_task_params(&tp_gfx, 1, TP_GFX, TP_GFX, 7);
   ret = thread_create(&tp_gfx, &sched_gfx, attr_gfx, &tid_gfx, gfx_task);
@@ -272,7 +272,7 @@ void* lin_model_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[0]);
     };
 
-    printf("T%d T1:%ld\n", 0, t_K_1[0].tv_nsec - t_0[0].tv_nsec);
+    // printf("T%d T1:%ld\n", 0, t_K_1[0].tv_nsec - t_0[0].tv_nsec);
 
     for (int i = 0; i < 3; i++) rpy[i] = state[i];
     for (int i = 0; i < 3; i++) xyz[i] = state[i + 3];
@@ -424,7 +424,7 @@ void* laser_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[1]);
     };
 
-    printf("T%d T1:%ld\n", 1, t_K_1[1].tv_nsec - t_0[1].tv_nsec);
+    // printf("T%d T1:%ld\n", 1, t_K_1[1].tv_nsec - t_0[1].tv_nsec);
 
     pthread_mutex_lock(&mux_state);
     memcpy(old_state, state, sizeof(double) * SIZE_X);
@@ -571,7 +571,7 @@ void* gfx_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[2]);
     };
 
-    printf("T%d T1:%ld\n", 2, t_K_1[2].tv_nsec - t_0[2].tv_nsec);
+    // printf("T%d T1:%ld\n", 2, t_K_1[2].tv_nsec - t_0[2].tv_nsec);
 
     pthread_mutex_lock(&mux_state);
     memcpy(old_pose, curr_pose, sizeof(double) * SIZE_Y);
@@ -670,7 +670,7 @@ void* plt_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[3]);
     };
 
-    printf("T%d T1:%ld\n", 3, t_K_1[3].tv_nsec - t_0[3].tv_nsec);
+    // printf("T%d T1:%ld\n", 3, t_K_1[3].tv_nsec - t_0[3].tv_nsec);
 
     pthread_mutex_lock(&mux_state);
     memcpy(new_pose, arr_state, sizeof(double) * SIZE_X);
@@ -745,7 +745,7 @@ void* point_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[4]);
     };
 
-    printf("T%d T1:%ld\n", 4, t_K_1[4].tv_nsec - t_0[4].tv_nsec);
+    // printf("T%d T1:%ld\n", 4, t_K_1[4].tv_nsec - t_0[4].tv_nsec);
 
     draw_msg(buffer_gfx, waypoints_num + 5, WIDTH_SCREEN - 100,
              HEIGHT_SCREEN / 2 + 50);
@@ -755,19 +755,18 @@ void* point_task(void* arg) {
       pthread_mutex_lock(&mux_points);
       add_waypoint(buffer_gfx, waypoints, &waypoints_num, Lmouse);
       pthread_mutex_unlock(&mux_points);
+      Lmouse_clicked = 0;
     }
 
     if (Rmouse_clicked) {
       // printf("R clicked\n");
       pthread_mutex_lock(&mux_points);
       pthread_mutex_lock(&mux_gfx);
-      del_waypoint(buffer_gfx, waypoints, &waypoints_num, Rmouse);
+      delete_waypoint(buffer_gfx, waypoints, &waypoints_num, Rmouse);
       pthread_mutex_unlock(&mux_points);
       pthread_mutex_unlock(&mux_gfx);
+      Rmouse_clicked = 0;
     }
-
-    Lmouse_clicked = 0;
-    Rmouse_clicked = 0;
 
     if (deadline_miss(tp)) printf("DEADLINE MISS: point_task()\n");
 
@@ -798,6 +797,9 @@ void* point_task(void* arg) {
 void* key_task(void* arg) {
   struct task_par* tp;
 
+  uint64_t Rmouse_down_count = 0;  
+  uint64_t Lmouse_down_count = 0;  
+  
   tp = (struct task_par*)arg;
   set_period(tp);
 
@@ -812,7 +814,7 @@ void* key_task(void* arg) {
       clock_gettime(CLOCK_MONOTONIC, &t_K_1[5]);
     };
 
-    printf("T%d T1:%ld\n", 5, t_K_1[5].tv_nsec - t_0[5].tv_nsec);
+    // printf("T%d T1:%ld\n", 5, t_K_1[5].tv_nsec - t_0[5].tv_nsec);
 
     scan = 0;
 
@@ -1006,18 +1008,27 @@ void* key_task(void* arg) {
     }
 
     // Check left mouse click
-    if (mouse_b & 1) {
+    if (mouse_b & 1 && (Lmouse_down_count < TP_KEY * 100) && !Lmouse_clicked) {
       Lmouse_clicked = 1;
       Lmouse.x = (double)mouse_x;
       Lmouse.y = (double)mouse_y;
+      Lmouse_down_count++;
+    }
+    else {
+      Lmouse_down_count = 0;
     }
 
     // Check right mouse click
-    if (mouse_b & 2) {
+    if (mouse_b & 2  && (Rmouse_down_count < TP_KEY * 100) && !Rmouse_clicked) {
       Rmouse_clicked = 1;
       Rmouse.x = (double)mouse_x;
       Rmouse.y = (double)mouse_y;
+      Rmouse_down_count++;
     }
+    else {
+      Rmouse_down_count = 0;
+    }
+
 
     if (deadline_miss(tp)) printf("DEADLINE MISS: key_task()\n");
 

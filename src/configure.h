@@ -20,6 +20,6 @@
 
 static void error(const char* msg, const char* msg1);
 
-int read_parameters(const char* config_file, DynParam* p);
+int read_parameters(const char* config_file, DynParams* p);
 
 // #endif  // CONFIGURE_H_

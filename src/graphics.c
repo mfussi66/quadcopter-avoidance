@@ -240,7 +240,7 @@ void add_waypoint(BITMAP* bmp, WPoint* array, int* num, WPoint point) {
  * Deletes a waypoint by checking which is the closest
  * from the clicked point
  */
-void del_waypoint(BITMAP* bmp, WPoint* array, int* num, WPoint point) {
+void delete_waypoint(BITMAP* bmp, WPoint* array, int* num, WPoint point) {
   int clicked_col;
   int n = *num;
   int min_dist_idx;
@@ -252,8 +252,7 @@ void del_waypoint(BITMAP* bmp, WPoint* array, int* num, WPoint point) {
 
   if (n < 0) return;
 
-  curr_max_dist =
-      sqrt(ENV_OFFSET_X * ENV_OFFSET_X + ENV_OFFSET_Y * ENV_OFFSET_Y) + 10;
+  curr_max_dist = sqrt(ENV_OFFSET_X * ENV_OFFSET_X + ENV_OFFSET_Y * ENV_OFFSET_Y) + 10;
   clicked_col = getpixel(bmp, (int)point.x, (int)point.y);
   memcpy(tmp_new_array, array, sizeof(WPoint) * MAX_WPOINTS);
 
