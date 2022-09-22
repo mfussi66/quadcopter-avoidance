@@ -134,40 +134,29 @@ void pid_rpy_control(double* e, double* e_prev, double dt, double* u, double* p,
  * world frame to accumulate correctly
  */
 void lin_model(double* u, double* x, double dt) {
-  double X_old[SIZE_X] = {0.0};
-  double X_new[SIZE_X] = {0.0};
-  double xy_tmp[2] = {0.0};
+  double deltax, deltay;
 
-  memcpy(X_old, x, sizeof(double) * SIZE_X);
+  x[6] += u[0] / Jxx * dt;     // p
+  x[0] += x[6] * dt * 0.5;     // roll
 
-  X_new[6] = X_old[6] + u[0] / Jxx;     // p
-  X_new[0] = X_old[0] + X_new[6] * dt;  // roll
+  x[7] += u[1] / Jyy * dt;     // q
+  x[1] += x[7] * dt * 0.5;     // pitch
 
-  X_new[7] = X_old[7] + u[1] / Jyy;     // q
-  X_new[1] = X_old[1] + X_new[7] * dt;  // pitch
+  x[8] += u[2] / Jzz * dt;     // r
+  x[2] += x[8] * dt * 0.5;     // yaw
 
-  X_new[8] = X_old[8] + u[2] / Jzz;     // r
-  X_new[2] = X_old[2] + X_new[8] * dt;  // yaw
+  x[9] += 9.81 * x[1];         // u
+  x[10] += 9.81 * x[0];        // v
+  x[11] += u[3] / M * dt;      // w
 
-  X_new[9] = X_old[9] + 9.81 * X_new[1];  // u
-  X_new[3] = X_new[9] * dt;               // x
+  deltax = x[9] * dt;          // deltax
+  deltay = x[10] * dt;         // deltay
 
-  X_new[10] = X_old[10] + 9.81 * X_new[0];  // v
-  X_new[4] = X_new[10] * dt;                // y
-
-  X_new[11] = X_old[11] + u[3] / M;      // w
-  X_new[5] = X_old[5] + X_new[11] * dt;  // z
-
-  xy_tmp[0] = X_new[3];
-  xy_tmp[1] = X_new[4];
-  X_new[3] = xy_tmp[0] * cos(X_new[2]) - xy_tmp[1] * sin(X_new[2]);
-  X_new[4] = +xy_tmp[0] * sin(X_new[2]) + xy_tmp[1] * cos(X_new[2]);
-
-  X_new[3] = X_old[3] + X_new[3];
-  X_new[4] = X_old[4] + X_new[4];
-
-  memcpy(x, X_new, sizeof(double) * SIZE_X);
+  x[3] += deltax * cos(x[2]) - deltay * sin(x[2]); // x
+  x[4] += deltax * sin(x[2]) + deltay * cos(x[2]); // y
+  x[5]  += x[11] * dt * 0.5;   // z
 }
+
 /*
  * Function: Laser scanner initializer
  * ---------------------------
@@ -392,9 +381,9 @@ void init_gains(double* p, double* d, double* p_df, double* d_df) {
   p[0] = 1.5e-1;  // x
   p[1] = 1.5e-1;  // y
   p[2] = 1e-4;    // z
-  p[3] = 1e-3;    // roll
-  p[4] = 1e-3;    // pitch
-  p[5] = 1e-4;    // yaw
+  p[3] = 1e-6;    // roll
+  p[4] = 1e-6;    // pitch
+  p[5] = 1e-6;    // yaw
   p[6] = 7e-2;    // u
   p[7] = 7e-2;    // v
   p[8] = 1e-2;    // w

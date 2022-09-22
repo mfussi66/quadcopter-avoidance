@@ -310,12 +310,12 @@ void* lin_model_task(void* arg) {
     // [1 OUTER LOOP] POSITION P CONTROL + ALTITUDE PD
     compute_error(setpoint_xyz, xyz, error_xyz, error_xyz_old, 3);
     rotate_error(error_xyz, rpy[2]);
-    pid_xyz_control(error_xyz, error_xyz_old, tp->period / 1000.0, forces,
+    pid_xyz_control(error_xyz, error_xyz_old, tp->period * 1e-30, forces,
                     setpoint_uvw, P_gains, D_gains, avoid);
 
     // [2 OUTER LOOP] VELOCITY P CONTROL
     compute_error(setpoint_uvw, uvw, error_vel, error_vel_old, 3);
-    pid_vel_control(error_vel, error_vel_old, tp->period / 1000.0, setpoint_rpy,
+    pid_vel_control(error_vel, error_vel_old, tp->period * 1e-3, setpoint_rpy,
                     P_gains, D_gains);
 
     // [INNER LOOP] ROLL PITCH YAW PID CONTROL
@@ -328,13 +328,13 @@ void* lin_model_task(void* arg) {
       setpoint_rpy[2] =
           atan2_safe(setpoint_xyz[1] - state[4], setpoint_xyz[0] - state[3]);
 
-    pid_rpy_control(error_rpy, error_rpy_old, tp->period / 1000.0, forces,
+    pid_rpy_control(error_rpy, error_rpy_old, tp->period * 1e-3, forces,
                     P_gains, D_gains);
 
     pthread_mutex_unlock(&mux_gains);
 
     // APPLY FORCES TO LINEAR SYSTEM
-    lin_model(forces, state, tp->period / 1000.0);
+    lin_model(forces, state, tp->period  * 1e-3);
 
     // 		sprintf(all_vals,"%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf;%lf\n",
     // 				state[0],state[1], state[2], state[3], state[4],
